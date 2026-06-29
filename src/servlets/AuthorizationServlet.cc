@@ -97,16 +97,11 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
     }
 
     if (sessionData.isNull()) {
-        // 未登录，重定向到登录页面，登录成功后再回到这里
-        std::string currentPath = request->getPath();
-        if (!request->getQuery().empty()) {
-            currentPath += "?" + request->getQuery();
-        }
-        std::string loginUrl = "/login?redirect=" + chen::StringUtil::UrlEncode(currentPath);
-        INFO(logger) << "no session, redirect to login: " << loginUrl;
-
-        response->setRedirect(loginUrl);
-        response->setStatus(chen::http::HttpStatus::FOUND);
+        // 未登录，前端根据错误码自行处理登录
+        INFO(logger) << "no session, return login_required";
+        result->setResult(401, "login_required");
+        response->setBody(result->toJsonString());
+        response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
     }
 

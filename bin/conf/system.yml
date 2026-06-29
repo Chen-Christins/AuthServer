@@ -5,7 +5,7 @@
 servers:
   - address: ["0.0.0.0:8090"]
     keepalive: 1
-    timeout: 1000
+    timeout: 120000
     name: chen-http/1.0.0
     accept_worker: accept
     io_worker: io
@@ -85,11 +85,11 @@ auth:
     private_key_path: /home/chen/workspace/AuthServer/bin/conf/keys/private.pem
     public_key_path: /home/chen/workspace/AuthServer/bin/conf/keys/public.pem
   token:
-    access_token_ttl: 3600
-    id_token_ttl: 3600
-    refresh_token_ttl: 2592000
-    auth_code_ttl: 300
-  session_ttl: 86400
+    access_token_ttl: 3600       # 1h — JWT 本身无状态，不存在 Redis
+    id_token_ttl: 3600           # 1h — ID Token 也是 JWT
+    refresh_token_ttl: 2592000   # 30d — Redis 自动过期
+    auth_code_ttl: 300           # 5min — Redis 自动过期
+  session_ttl: 86400             # 24h — Redis 自动过期
 
 # MySQL 配置
 mysql:
