@@ -1,0 +1,19 @@
+<table name="oauth_users" namespace="auth.data" desc="OIDC 用户表">
+    <columns>
+        <column name="id" type="int64" auto_increment="true" desc="主键"/>
+        <column name="username" type="string" desc="用户名"/>
+        <column name="email" type="string" desc="邮箱"/>
+        <column name="password_hash" type="string" desc="bcrypt 密码哈希"/>
+        <column name="display_name" type="string" desc="显示名称"/>
+        <column name="avatar_url" type="string" desc="头像 URL"/>
+        <column name="email_verified" type="int32" default="0" desc="邮箱是否已验证"/>
+        <column name="enabled" type="int32" default="1" desc="是否启用"/>
+        <column name="create_time" type="datetime" default="current_timestamp" desc="创建时间"/>
+        <column name="update_time" type="datetime" default="current_timestamp" desc="更新时间"/>
+    </columns>
+    <indexs>
+        <index name="pk" cols="id" type="pk"/>
+        <index name="idx_username" cols="username" type="uniq"/>
+        <index name="idx_email" cols="email" type="uniq"/>
+    </indexs>
+</table>
