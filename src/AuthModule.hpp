@@ -82,6 +82,12 @@ public:
 
 private:
     /**
+     * @brief 初始化 MySQL 表
+     * @return bool 是否成功
+     */
+    bool initMySQL();
+
+    /**
      * @brief 注册Servlets
      */
     void registerServlets(std::vector<chen::TcpServer::ptr>& servers);

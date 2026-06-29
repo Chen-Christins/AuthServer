@@ -2,15 +2,16 @@
 
 #include "../JwtUtil.hpp"
 #include "../OidcConfig.hpp"
+#include "../util.h"
+#include "auth/data/oauth_users_info.h"
 
 #include <chen/log/log.h>
-#include <chen/util/json_util.h>
 #include <chen/util/string_util.h>
 #include <chen/util/time_util.h>
 
 namespace auth {
 
-static chen::Logger::ptr logger = LOG_NAME("auth.userinfo");
+static chen::Logger::ptr logger = LOG_NAME("auth");
 
 UserInfoServlet::UserInfoServlet() : AuthServlet("UserInfoServlet") {}
 
@@ -19,9 +20,9 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     // ========== 1. 提取 Bearer Token ==========
     std::string auth = request->getHeader("Authorization");
     if (auth.size() <= 7 || strncasecmp(auth.c_str(), "Bearer ", 7) != 0) {
-        response->setBody("{\"error\":\"invalid_token\","
-                          "\"error_description\":\"missing Bearer token\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        result->set("error_description", "missing Bearer token");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
@@ -31,10 +32,10 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
 
     // ========== 2. 验证 JWT 签名 ==========
     Json::Value payload;
-    if (!JwtUtil::verifyJWT(token, OidcConfig::publicKeyPem, payload)) {
+    if (!JwtUtil::verifyJWT(token, OidcConfig::s_publicKeyPem, payload)) {
         WARN(logger) << "userinfo: invalid token signature";
-        response->setBody("{\"error\":\"invalid_token\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
@@ -44,35 +45,44 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     uint64_t nowSec = chen::GetCurrentMs() / 1000;
     if (payload["exp"].asInt64() < static_cast<int64_t>(nowSec)) {
         WARN(logger) << "userinfo: token expired";
-        response->setBody("{\"error\":\"invalid_token\","
-                          "\"error_description\":\"token expired\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        result->set("error_description", "token expired");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
     }
 
-    // ========== 4. 构建 UserInfo 响应 ==========
-    // sub = 用户 ID（字符串形式）
-    // 从 token 的 payload 中提取 scope 决定返回哪些 claims
+    // ========== 4. 从数据库查用户信息 ==========
+    int64_t userId = std::stoll(payload["sub"].asString());
     std::string scope = payload.get("scope", "").asString();
     auto scopes = chen::StringUtil::Split(scope, ' ');
 
-    Json::Value userInfo;
-    userInfo["sub"] = payload["sub"].asString();
+    // Token 中的 sub 是用户 ID，查数据库
+    auto userInfo = auth::data::OauthUsersInfoDao::Query(userId, GetDB());
+    if (!userInfo) {
+        ERROR(logger) << "userinfo: user not found, sub=" << payload["sub"].asString();
+        result->setResult(404, "user_not_found");
+        response->setBody(result->toJsonString());
+        response->setStatus(chen::http::HttpStatus::NOT_FOUND);
+        return 0;
+    }
+
+    // ========== 5. 根据 scope 返回 claims ==========
+    result->setResult(200, "ok");
+    result->set("sub", payload["sub"].asString());
 
     for (auto& s : scopes) {
         if (s == "profile") {
-            userInfo["name"] = payload.get("name", "");
-            userInfo["preferred_username"] = payload.get("preferred_username", "");
+            result->set("name", userInfo->getDisplayName());
+            result->set("preferred_username", userInfo->getUsername());
         } else if (s == "email") {
-            userInfo["email"] = payload.get("email", "");
-            userInfo["email_verified"] = payload.get("email_verified", false);
+            result->set("email", userInfo->getEmail());
+            result->set("email_verified", userInfo->getEmailVerified());
         }
     }
 
-    response->setBody(chen::JsonUtil::ToString(userInfo));
-    response->setHeader("Content-Type", "application/json");
+    response->setBody(result->toJsonString());
     response->setStatus(chen::http::HttpStatus::OK);
 
     INFO(logger) << "userinfo success sub=" << payload["sub"].asString();

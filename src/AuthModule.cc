@@ -1,10 +1,15 @@
 #include "AuthModule.hpp"
 
+#include <ranges>
+
 #include <chen/log/log.h>
 #include <chen/application.h>
 #include <chen/http/http_server.h>
+#include <chen/db/mysql.h>
 
 #include "OidcConfig.hpp"
+#include "auth/data/oauth_users_info.h"
+#include "auth/data/oauth_clients_info.h"
 #include "servlets/OidcDiscoveryServlet.hpp"
 #include "servlets/JwksServlet.hpp"
 #include "servlets/AuthorizationServlet.hpp"
@@ -15,6 +20,9 @@
 namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
+
+static chen::ConfigVar<std::map<std::string, std::map<std::string, std::string>>>::ptr g_mysql_dbs =
+    chen::Config::Lookup("mysql.dbs", std::map<std::string, std::map<std::string, std::string>>(), "mysql dbs");
 
 AuthModule::AuthModule() 
     : chen::Module("AuthModule", "1.0.0", "") {
@@ -43,6 +51,11 @@ bool AuthModule::onServerReady() {
 
     // 初始化 OIDC 配置（加载密钥和配置项）
     OidcConfig::init();
+
+    if (!initMySQL()) {
+        ERROR(logger) << "initDB failed";
+        return false;
+    }
 
     std::vector<chen::TcpServer::ptr> servers;
     if (chen::Application::GetInstance()->getServer("http", servers)) {
@@ -78,6 +91,39 @@ uint64_t AuthModule::getTickIntervalMs() {
     return 0;
 }
 
+bool AuthModule::initMySQL() {
+    const auto& mysql_dbs = g_mysql_dbs->getValue();
+    for (const auto& params : mysql_dbs | std::views::values) {
+        chen::MySQL::ptr mysql(new chen::MySQL(params));
+        if (!mysql->connect()) {
+            ERROR(logger) << "connect mysql failed";
+            return false;
+        }
+
+#define XX(class_name, table_name)                             \
+    if (auth::data::class_name::CreateTableMySQL(mysql)) {     \
+        ERROR(logger) << "create " table_name " table failed"; \
+        return false;                                          \
+    }
+    XX(OauthClientsInfoDao, "oauth_clients_info")
+    XX(OauthUsersInfoDao, "oauth_users_info")
+#undef XX
+
+    // 数据库迁移：为已有表补充新增列
+    {
+        INFO(logger) << "migrate database begin";
+#define XX(clazz) auth::data::clazz::MigrateTableMySQL(mysql);
+        XX(OauthClientsInfoDao)
+        XX(OauthUsersInfoDao)
+#undef XX
+        INFO(logger) << "migrate database end";
+    }
+
+    }
+
+    return true;
+}
+
 void AuthModule::registerServlets(std::vector<chen::TcpServer::ptr>& servers) {
     INFO(logger) << "registerServlets";
 
@@ -88,8 +134,7 @@ void AuthModule::registerServlets(std::vector<chen::TcpServer::ptr>& servers) {
 #define XX(clazz) chen::http::Servlet::ptr(new clazz)
 
         // OIDC 端点
-        dp->addServlet("/.well-known/openid-configuration",
-                       XX(OidcDiscoveryServlet));
+        dp->addServlet("/.well-known/openid-configuration", XX(OidcDiscoveryServlet));
         dp->addServlet("/jwks.json", XX(JwksServlet));
         dp->addServlet("/authorize", XX(AuthorizationServlet));
         dp->addServlet("/login", XX(LoginServlet));

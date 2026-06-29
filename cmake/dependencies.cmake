@@ -10,5 +10,7 @@ else()
 endif()
 
 include_directories(${CHEN_SDK_DIR}/include)
+include_directories(${PROJECT_SOURCE_DIR}/dbproxy/data)
 
 add_subdirectory(${CHEN_SDK_DIR})
+add_subdirectory(${PROJECT_SOURCE_DIR}/dbproxy/data)

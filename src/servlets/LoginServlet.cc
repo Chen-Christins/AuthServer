@@ -8,7 +8,7 @@
 
 namespace auth {
 
-static chen::Logger::ptr logger = LOG_NAME("auth.login");
+static chen::Logger::ptr logger = LOG_NAME("auth");
 
 LoginServlet::LoginServlet() : AuthServlet("LoginServlet") {}
 
@@ -19,7 +19,7 @@ int32_t LoginServlet::handle(chen::http::HttpRequest::ptr request, chen::http::H
         return handleGet(request, response);
     }
     if (request->getMethod() == chen::http::HttpMethod::POST) {
-        return handlePost(request, response);
+        return handlePost(request, response, result);
     }
 
     response->setStatus(chen::http::HttpStatus::METHOD_NOT_ALLOWED);
@@ -76,7 +76,7 @@ button:hover{background:#4096ff}
     return 0;
 }
 
-int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response) {
+int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response, Result::ptr result) {
     std::string username = request->getParam("username");
     std::string password = request->getParam("password");
     std::string redirect = request->getParam("redirect");
@@ -96,18 +96,18 @@ int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::htt
 
     // 创建会话
     std::string sid =
-        SessionStore::createSession(user["id"].asInt64(), user["username"].asString(), OidcConfig::sessionTtl);
+        SessionStore::createSession(user["id"].asInt64(), user["username"].asString(), OidcConfig::s_sessionTtl);
     if (sid.empty()) {
         ERROR(logger) << "create session failed";
-        response->setBody("{\"error\":\"server_error\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(500, "server_error");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::INTERNAL_SERVER_ERROR);
         return 0;
     }
 
     // 设置 SESSIONID cookie
     std::string cookie =
-        "SESSIONID=" + sid + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + std::to_string(OidcConfig::sessionTtl);
+        "SESSIONID=" + sid + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + std::to_string(OidcConfig::s_sessionTtl);
     response->setHeader("Set-Cookie", cookie);
 
     // 重定向回去

@@ -10,3 +10,8 @@ build
 protocol/include
 orm
 tools
+server
+.venv
+*.pyc
+*.pem
+*.pid

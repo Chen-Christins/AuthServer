@@ -23,7 +23,9 @@ public:
 private:
     int32_t handleGet(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response);
     
-    int32_t handlePost(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response);
+    int32_t handlePost(chen::http::HttpRequest::ptr request,
+                       chen::http::HttpResponse::ptr response,
+                       Result::ptr result);
 };
 
 } // namespace auth
