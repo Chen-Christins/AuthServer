@@ -41,13 +41,6 @@ session = requests.Session()
 # ============================================================
 # 工具函数
 # ============================================================
-def abs_url(url):
-    """将相对 URL 补全为绝对 URL"""
-    if url.startswith("http://") or url.startswith("https://"):
-        return url
-    return AUTH_BASE + url
-
-
 def expect(resp, code=200, msg=None):
     """检查 Result 响应"""
     if resp.status_code != code:
@@ -175,7 +168,7 @@ print()
 # Step 2 — JWKS
 # ============================================================
 print("--- Step 2: JWKS ---")
-r = requests.get(f"{AUTH_BASE}/jwks.json")
+r = requests.get(f"{AUTH_BASE}/jwks.json", headers={"Connection": "close"})
 d = expect(r, 200, "ok")
 if d:
     keys = d.get("data", d).get("keys", [])
@@ -192,7 +185,7 @@ print()
 # ============================================================
 print("--- Step 3: 授权码流程 ---")
 
-# 3a. 发起 /authorize（未登录应重定向到 /login）
+# 3a. 发起 /authorize（未登录应返回 login_required）
 authz_params = {
     "response_type": "code",
     "client_id": CLIENT_ID,
@@ -202,39 +195,23 @@ authz_params = {
 }
 r = session.get(f"{AUTH_BASE}/authorize",
                 params=authz_params, allow_redirects=False)
-if r.status_code != 302:
-    print(f"{FAIL} /authorize 期望 302, 收到 {r.status_code}")
+if r.status_code != 401:
+    print(f"{FAIL} /authorize 期望 401, 收到 {r.status_code}")
     if r.text:
         print(f"     body: {r.text[:200]}")
     sys.exit(1)
-login_url = abs_url(r.headers.get("Location", ""))
-if "/login?redirect=" not in login_url:
-    print(f"{FAIL} 未重定向到 /login, Location={login_url}")
+
+data = expect(r, 401, "login_required")
+if not data:
     sys.exit(1)
-print(f"{OK} 未登录 → 302 到 /login")
+print(f"{OK} 未登录 → 401 login_required")
 
-# 提取 redirect 参数
-parsed = urllib.parse.urlparse(login_url)
-login_redirect = urllib.parse.parse_qs(parsed.query).get("redirect", [""])[0]
-print(f"     redirect back to: {urllib.parse.unquote(login_redirect)[:80]}...")
-
-# 3b. 登录（POST /login）
-r = session.post(f"{AUTH_BASE}/login", allow_redirects=False, data={
-    "username": USERNAME,
-    "password": PASSWORD,
-    "redirect": login_redirect,
-})
-loc = r.headers.get("Location", "")
-
-if r.status_code != 302:
-    print(f"{FAIL} /login POST 期望 302, 收到 {r.status_code}")
-    print(f"     body: {r.text[:200]}")
-    sys.exit(1)
-
-if "error=1" in loc:
-    print(f"{FAIL} 登录被拒 (密码错误或用户不存在)")
-    print(f"     Location: {loc}")
-    # 尝试直连 MySQL 查看密码哈希状态
+# 3b. 登录（POST /login, JSON body）
+r = session.post(f"{AUTH_BASE}/login",
+    json={"username": USERNAME, "password": PASSWORD})
+d = expect(r, 200, "ok")
+if not d:
+    print(f"{FAIL} 登录失败")
     try:
         import pymysql
         conn = pymysql.connect(host=DB_HOST, port=3306, user="root",
@@ -245,8 +222,6 @@ if "error=1" in loc:
         row = cur.fetchone()
         if row:
             print(f"     MySQL 中有用户 {row[0]}, hash={row[1]}")
-            pw_len = len(row[1])
-            print(f"     hash 长度: {pw_len}")
         else:
             print(f"     用户 {USERNAME} 在 MySQL 中不存在!")
     except Exception as e2:
@@ -255,9 +230,9 @@ if "error=1" in loc:
 
 print(f"{OK} 登录成功")
 
-# 3c. 跟随重定向回 /authorize（带上 session cookie）
-authz_url = abs_url(loc)
-r = session.get(authz_url, allow_redirects=False)
+# 3c. 再次请求 /authorize（带上 session cookie）
+r = session.get(f"{AUTH_BASE}/authorize",
+                params=authz_params, allow_redirects=False)
 if r.status_code != 302:
     print(f"{FAIL} /authorize (已登录) 期望 302, 收到 {r.status_code}")
     print(f"     body: {r.text[:200]}")
