@@ -19,9 +19,9 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     // ========== 1. 提取 Bearer Token ==========
     std::string auth = request->getHeader("Authorization");
     if (auth.size() <= 7 || strncasecmp(auth.c_str(), "Bearer ", 7) != 0) {
-        response->setBody("{\"error\":\"invalid_token\","
-                          "\"error_description\":\"missing Bearer token\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        result->set("error_description", "missing Bearer token");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
@@ -33,8 +33,8 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     Json::Value payload;
     if (!JwtUtil::verifyJWT(token, OidcConfig::publicKeyPem, payload)) {
         WARN(logger) << "userinfo: invalid token signature";
-        response->setBody("{\"error\":\"invalid_token\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
@@ -44,35 +44,34 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     uint64_t nowSec = chen::GetCurrentMs() / 1000;
     if (payload["exp"].asInt64() < static_cast<int64_t>(nowSec)) {
         WARN(logger) << "userinfo: token expired";
-        response->setBody("{\"error\":\"invalid_token\","
-                          "\"error_description\":\"token expired\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_token");
+        result->set("error_description", "token expired");
+        response->setBody(result->toJsonString());
         response->setHeader("WWW-Authenticate", "Bearer error=\"invalid_token\"");
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
     }
 
     // ========== 4. 构建 UserInfo 响应 ==========
-    // sub = 用户 ID（字符串形式）
-    // 从 token 的 payload 中提取 scope 决定返回哪些 claims
     std::string scope = payload.get("scope", "").asString();
     auto scopes = chen::StringUtil::Split(scope, ' ');
 
-    Json::Value userInfo;
-    userInfo["sub"] = payload["sub"].asString();
+    result->setResult(200, "ok");
+    result->set("sub", payload["sub"].asString());
 
     for (auto& s : scopes) {
         if (s == "profile") {
-            userInfo["name"] = payload.get("name", "");
-            userInfo["preferred_username"] = payload.get("preferred_username", "");
+            result->set("name", payload.get("name", "").asString());
+            result->set("preferred_username",
+                         payload.get("preferred_username", "").asString());
         } else if (s == "email") {
-            userInfo["email"] = payload.get("email", "");
-            userInfo["email_verified"] = payload.get("email_verified", false);
+            result->set("email", payload.get("email", "").asString());
+            result->set("email_verified",
+                         payload.get("email_verified", false).asInt());
         }
     }
 
-    response->setBody(chen::JsonUtil::ToString(userInfo));
-    response->setHeader("Content-Type", "application/json");
+    response->setBody(result->toJsonString());
     response->setStatus(chen::http::HttpStatus::OK);
 
     INFO(logger) << "userinfo success sub=" << payload["sub"].asString();

@@ -26,17 +26,17 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
     // ========== 2. 参数校验 ==========
     if (responseType != "code") {
         ERROR(logger) << "unsupported response_type: " << responseType;
-        response->setBody("{\"error\":\"unsupported_response_type\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(400, "unsupported_response_type");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::BAD_REQUEST);
         return 0;
     }
 
     if (clientId.empty()) {
         ERROR(logger) << "client_id is required";
-        response->setBody("{\"error\":\"invalid_request\","
-                          "\"error_description\":\"client_id required\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(400, "invalid_request");
+        result->set("error_description", "client_id required");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::BAD_REQUEST);
         return 0;
     }
@@ -45,8 +45,8 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
     Json::Value client = ClientStore::findByClientId(clientId);
     if (client.isNull()) {
         ERROR(logger) << "invalid client_id: " << clientId;
-        response->setBody("{\"error\":\"invalid_client\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(401, "invalid_client");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::UNAUTHORIZED);
         return 0;
     }
@@ -54,8 +54,8 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
     // 校验 redirect_uri
     if (!redirectUri.empty() && !ClientStore::validateRedirectUri(clientId, redirectUri)) {
         ERROR(logger) << "redirect_uri mismatch for client=" << clientId << ", uri=" << redirectUri;
-        response->setBody("{\"error\":\"invalid_redirect_uri\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(400, "invalid_redirect_uri");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::BAD_REQUEST);
         return 0;
     }
@@ -124,8 +124,8 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
 
     if (!AuthCodeStore::save(code, codeJson, OidcConfig::authCodeTtl)) {
         ERROR(logger) << "failed to save auth code to redis";
-        response->setBody("{\"error\":\"server_error\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(500, "server_error");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::INTERNAL_SERVER_ERROR);
         return 0;
     }

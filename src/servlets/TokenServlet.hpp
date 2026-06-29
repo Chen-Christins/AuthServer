@@ -21,8 +21,13 @@ public:
                            Result::ptr result) override;
 
 private:
-    int32_t handleAuthCodeGrant(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response);
-    int32_t handleRefreshTokenGrant(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response);
+    int32_t handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
+                                chen::http::HttpResponse::ptr response, 
+                                Result::ptr result);
+
+    int32_t handleRefreshTokenGrant(chen::http::HttpRequest::ptr request, 
+                                    chen::http::HttpResponse::ptr response, 
+                                    Result::ptr result);
 };
 
 } // namespace auth

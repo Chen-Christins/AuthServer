@@ -1,0 +1,1 @@
+- [Result 响应封装](result-response-pattern.md) — 所有 JSON 响应通过 Result 结构体处理

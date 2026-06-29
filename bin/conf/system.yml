@@ -82,8 +82,8 @@ auth:
   issuer: "http://localhost:8090"
   key:
     kid: "rsa1"
-    private_key_path: "/home/chen/workspace/AuthServer/conf/keys/private.pem"
-    public_key_path: "/home/chen/workspace/AuthServer/conf/keys/public.pem"
+    private_key_path: "/home/chen/workspace/AuthServer/bin/conf/keys/private.pem"
+    public_key_path: "/home/chen/workspace/AuthServer/bin/conf/keys/public.pem"
   token:
     access_token_ttl: 3600
     id_token_ttl: 3600

@@ -4,6 +4,7 @@
 #include "../OidcConfig.hpp"
 
 #include <chen/log/log.h>
+#include <chen/util/json_util.h>
 
 namespace auth {
 
@@ -15,16 +16,20 @@ int32_t JwksServlet::handle(chen::http::HttpRequest::ptr request, chen::http::Ht
         , chen::http::HttpSession::ptr session, Result::ptr result) {
     if (OidcConfig::publicKeyPem.empty()) {
         ERROR(logger) << "public key not loaded";
-        response->setBody("{\"error\":\"server_config_error\"}");
-        response->setHeader("Content-Type", "application/json");
+        result->setResult(500, "server_config_error");
+        response->setBody(result->toJsonString());
         response->setStatus(chen::http::HttpStatus::INTERNAL_SERVER_ERROR);
         return 0;
     }
 
-    std::string jwks = JwtUtil::extractJWKS(OidcConfig::publicKeyPem, OidcConfig::kid);
+    // JWKS JSON 解析后放入 data 层
+    Json::Value jwks;
+    chen::JsonUtil::FromString(jwks,
+        JwtUtil::extractJWKS(OidcConfig::publicKeyPem, OidcConfig::kid));
+    result->setResult(200, "ok");
+    result->set("keys", jwks["keys"]);
 
-    response->setBody(jwks);
-    response->setHeader("Content-Type", "application/json");
+    response->setBody(result->toJsonString());
     response->setStatus(chen::http::HttpStatus::OK);
     return 0;
 }
