@@ -12,7 +12,7 @@ include_directories(${PROJECT_SOURCE_DIR}/protocol/include)
 include_directories(${PROJECT_SOURCE_DIR}/dbproxy/data)
 
 # 创建博客服务器模块
-create_server_module(bot
+create_server_module(auth
     ${PROJECT_SOURCE_DIR}/src
     ${PROJECT_SOURCE_DIR}/bin/module
     ${PROJECT_SOURCE_DIR}/bin

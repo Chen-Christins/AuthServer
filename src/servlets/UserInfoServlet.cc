@@ -2,15 +2,16 @@
 
 #include "../JwtUtil.hpp"
 #include "../OidcConfig.hpp"
+#include "../util.h"
+#include "auth/data/oauth_users_info.h"
 
 #include <chen/log/log.h>
-#include <chen/util/json_util.h>
 #include <chen/util/string_util.h>
 #include <chen/util/time_util.h>
 
 namespace auth {
 
-static chen::Logger::ptr logger = LOG_NAME("auth.userinfo");
+static chen::Logger::ptr logger = LOG_NAME("auth");
 
 UserInfoServlet::UserInfoServlet() : AuthServlet("UserInfoServlet") {}
 
@@ -31,7 +32,7 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
 
     // ========== 2. 验证 JWT 签名 ==========
     Json::Value payload;
-    if (!JwtUtil::verifyJWT(token, OidcConfig::publicKeyPem, payload)) {
+    if (!JwtUtil::verifyJWT(token, OidcConfig::s_publicKeyPem, payload)) {
         WARN(logger) << "userinfo: invalid token signature";
         result->setResult(401, "invalid_token");
         response->setBody(result->toJsonString());
@@ -52,22 +53,32 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
         return 0;
     }
 
-    // ========== 4. 构建 UserInfo 响应 ==========
+    // ========== 4. 从数据库查用户信息 ==========
+    int64_t userId = std::stoll(payload["sub"].asString());
     std::string scope = payload.get("scope", "").asString();
     auto scopes = chen::StringUtil::Split(scope, ' ');
 
+    // Token 中的 sub 是用户 ID，查数据库
+    auto userInfo = auth::data::OauthUsersInfoDao::Query(userId, GetDB());
+    if (!userInfo) {
+        ERROR(logger) << "userinfo: user not found, sub=" << payload["sub"].asString();
+        result->setResult(404, "user_not_found");
+        response->setBody(result->toJsonString());
+        response->setStatus(chen::http::HttpStatus::NOT_FOUND);
+        return 0;
+    }
+
+    // ========== 5. 根据 scope 返回 claims ==========
     result->setResult(200, "ok");
     result->set("sub", payload["sub"].asString());
 
     for (auto& s : scopes) {
         if (s == "profile") {
-            result->set("name", payload.get("name", "").asString());
-            result->set("preferred_username",
-                         payload.get("preferred_username", "").asString());
+            result->set("name", userInfo->getDisplayName());
+            result->set("preferred_username", userInfo->getUsername());
         } else if (s == "email") {
-            result->set("email", payload.get("email", "").asString());
-            result->set("email_verified",
-                         payload.get("email_verified", false).asInt());
+            result->set("email", userInfo->getEmail());
+            result->set("email_verified", userInfo->getEmailVerified());
         }
     }
 

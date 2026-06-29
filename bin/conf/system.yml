@@ -81,9 +81,9 @@ redis:
 auth:
   issuer: "http://localhost:8090"
   key:
-    kid: "rsa1"
-    private_key_path: "/home/chen/workspace/AuthServer/bin/conf/keys/private.pem"
-    public_key_path: "/home/chen/workspace/AuthServer/bin/conf/keys/public.pem"
+    kid: rsa1
+    private_key_path: /home/chen/workspace/AuthServer/bin/conf/keys/private.pem
+    public_key_path: /home/chen/workspace/AuthServer/bin/conf/keys/public.pem
   token:
     access_token_ttl: 3600
     id_token_ttl: 3600
@@ -93,10 +93,12 @@ auth:
 
 # MySQL 配置
 mysql:
-  auth:
-    host: 127.0.0.1:3306
-    user: root
-    passwd: your_password
-    dbname: auth_server
-    pool: 2
-    charset: utf8mb4
+  dbs:
+    auth:
+      dbname: auth
+      host: 192.168.139.3
+      port: 3306
+      user: root
+      passwd: 123456
+      pool: 2
+      charset: utf8mb4

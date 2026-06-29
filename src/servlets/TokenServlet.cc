@@ -13,7 +13,7 @@
 
 namespace auth {
 
-static chen::Logger::ptr logger = LOG_NAME("auth.token");
+static chen::Logger::ptr logger = LOG_NAME("auth");
 
 TokenServlet::TokenServlet() : AuthServlet("TokenServlet") {}
 
@@ -131,10 +131,10 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
 
     // ===== 生成 ID Token =====
     Json::Value idTokenPayload;
-    idTokenPayload["iss"] = OidcConfig::issuer;
+    idTokenPayload["iss"] = OidcConfig::s_issuer;
     idTokenPayload["sub"] = std::to_string(userId);
     idTokenPayload["aud"] = clientId;
-    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::idTokenTtl);
+    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_idTokenTtl);
     idTokenPayload["iat"] = static_cast<Json::Int64>(nowSec);
     idTokenPayload["auth_time"] = static_cast<Json::Int64>(nowSec);
     if (!nonce.empty()) {
@@ -155,7 +155,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     }
 
     std::string idToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(idTokenPayload), OidcConfig::kid, OidcConfig::privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(idTokenPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
     if (idToken.empty()) {
         ERROR(logger) << "create id_token failed";
         errorResponse(result, response, "server_error");
@@ -164,16 +164,16 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
 
     // ===== 生成 Access Token =====
     Json::Value atPayload;
-    atPayload["iss"] = OidcConfig::issuer;
+    atPayload["iss"] = OidcConfig::s_issuer;
     atPayload["sub"] = std::to_string(userId);
     atPayload["aud"] = clientId;
     atPayload["client_id"] = clientId;
-    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::accessTokenTtl);
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_accessTokenTtl);
     atPayload["iat"] = static_cast<Json::Int64>(nowSec);
     atPayload["scope"] = scope;
 
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::kid, OidcConfig::privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed";
         errorResponse(result, response, "server_error");
@@ -188,7 +188,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     rtData["user_id"] = userId;
     rtData["username"] = username;
     rtData["scope"] = scope;
-    if (!RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData), OidcConfig::refreshTokenTtl)) {
+    if (!RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData), OidcConfig::s_refreshTokenTtl)) {
         ERROR(logger) << "save refresh_token failed";
     }
 
@@ -196,7 +196,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     result->setResult(200, "ok");
     result->set("access_token", accessToken);
     result->set("token_type", std::string("Bearer"));
-    result->set("expires_in", OidcConfig::accessTokenTtl);
+    result->set("expires_in", OidcConfig::s_accessTokenTtl);
     result->set("id_token", idToken);
     result->set("refresh_token", refreshToken);
 
@@ -248,16 +248,16 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
 
     // ===== 生成新的 Access Token =====
     Json::Value atPayload;
-    atPayload["iss"] = OidcConfig::issuer;
+    atPayload["iss"] = OidcConfig::s_issuer;
     atPayload["sub"] = std::to_string(userId);
     atPayload["aud"] = clientId;
     atPayload["client_id"] = clientId;
-    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::accessTokenTtl);
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_accessTokenTtl);
     atPayload["iat"] = static_cast<Json::Int64>(nowSec);
     atPayload["scope"] = scope;
 
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::kid, OidcConfig::privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed on refresh";
         errorResponse(result, response, "server_error");
@@ -272,7 +272,7 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     newRtData["user_id"] = userId;
     newRtData["username"] = username;
     newRtData["scope"] = scope;
-    if (!RefreshTokenStore::save(newRT, chen::JsonUtil::ToString(newRtData), OidcConfig::refreshTokenTtl)) {
+    if (!RefreshTokenStore::save(newRT, chen::JsonUtil::ToString(newRtData), OidcConfig::s_refreshTokenTtl)) {
         ERROR(logger) << "save new refresh_token failed";
     }
 
@@ -280,7 +280,7 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     result->setResult(200, "ok");
     result->set("access_token", accessToken);
     result->set("token_type", std::string("Bearer"));
-    result->set("expires_in", OidcConfig::accessTokenTtl);
+    result->set("expires_in", OidcConfig::s_accessTokenTtl);
     result->set("refresh_token", newRT);
 
     response->setBody(result->toJsonString());

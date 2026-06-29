@@ -12,15 +12,15 @@
 namespace auth {
 
 struct OidcConfig {
-    static std::string issuer;
-    static std::string privateKeyPem;
-    static std::string publicKeyPem;
-    static std::string kid;
-    static int accessTokenTtl;
-    static int idTokenTtl;
-    static int refreshTokenTtl;
-    static int authCodeTtl;
-    static int sessionTtl;
+    static std::string s_issuer;
+    static std::string s_privateKeyPem;
+    static std::string s_publicKeyPem;
+    static std::string s_kid;
+    static int s_accessTokenTtl;
+    static int s_idTokenTtl;
+    static int s_refreshTokenTtl;
+    static int s_authCodeTtl;
+    static int s_sessionTtl;
 
     static void init();
 };

@@ -15,7 +15,7 @@
 
 namespace auth {
 
-static chen::Logger::ptr logger = LOG_NAME("auth.jwt");
+static chen::Logger::ptr logger = LOG_NAME("auth");
 
 std::string JwtUtil::createJWT(const std::string& payloadJson, const std::string& kid
         , const std::string& privateKeyPem) {
@@ -53,7 +53,7 @@ bool JwtUtil::verifyJWT(const std::string& jwt, const std::string& publicKeyPem,
     }
 
     std::string input = parts[0] + "." + parts[1];
-    std::string sig = chen::StringUtil::Base64Decode(parts[2]);
+    std::string sig = chen::StringUtil::Base64UrlDecode(parts[2]);
     if (sig.empty()) {
         ERROR(logger) << "verifyJWT: base64 decode signature failed";
         return false;
@@ -64,7 +64,7 @@ bool JwtUtil::verifyJWT(const std::string& jwt, const std::string& publicKeyPem,
         return false;
     }
 
-    std::string payloadJson = chen::StringUtil::Base64Decode(parts[1]);
+    std::string payloadJson = chen::StringUtil::Base64UrlDecode(parts[1]);
     if (!chen::JsonUtil::FromString(payload, payloadJson)) {
         ERROR(logger) << "verifyJWT: parse payload failed";
         return false;

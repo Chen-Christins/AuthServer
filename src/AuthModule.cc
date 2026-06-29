@@ -91,7 +91,7 @@ uint64_t AuthModule::getTickIntervalMs() {
     return 0;
 }
 
-bool initMySQL() {
+bool AuthModule::initMySQL() {
     const auto& mysql_dbs = g_mysql_dbs->getValue();
     for (const auto& params : mysql_dbs | std::views::values) {
         chen::MySQL::ptr mysql(new chen::MySQL(params));
