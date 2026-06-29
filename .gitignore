@@ -1,0 +1,12 @@
+.vscode
+.idea
+*sdk*
+build
+.DS_Store
+*.log
+.cache
+*.so
+*_server
+protocol/include
+orm
+tools

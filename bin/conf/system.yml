@@ -1,0 +1,102 @@
+# Chen Blog System Configuration
+# This configuration file defines the settings for the Chen Blog system, including server configurations, worker threads, logging, database connections, and Redis settings.
+
+# Servers Configuration, defining the HTTP and WebSocket servers with their respective settings.
+servers:
+  - address: ["0.0.0.0:8090"]
+    keepalive: 1
+    timeout: 1000
+    name: chen-http/1.0.0
+    accept_worker: accept
+    io_worker: io
+    process_worker: io
+    type: http
+
+# Worker threads configuration, defining the number of threads for IO and accept workers.
+workers:
+  io:
+    thread_num: 1
+  accept:
+    thread_num: 1
+
+# Server configuration, including work path, PID file, and email service settings for sending notifications or alerts.
+server:
+  work_path: /home/chen/workspace/AuthServer
+  pid_file: auth.pid
+
+# Logging configuration, defining different loggers for root, system, and access logs with their respective levels, formatters, and appenders.
+logs:
+  - name: root
+    level: info
+    formatter: "[%d{%Y-%m-%d %H:%M:%S.%f}]%T%t%T%N%T[%p]%T[%c]%T%f:%l%T%m%n"
+    appenders:
+      - type: FileLogAppender
+        file: /home/chen/workspace/AuthServer/logs/root.log
+      - type: StdoutLogAppender
+  - name: system
+    level: info
+    formatter: "[%d{%Y-%m-%d %H:%M:%S.%f}]%T%t%T%N%T[%p]%T[%c]%T%f:%l%T%m%n"
+    appenders:
+      - type: FileLogAppender
+        file: /home/chen/workspace/AuthServer/logs/system.log
+      - type: StdoutLogAppender
+  - name: access
+    level: info
+    formatter: "[%d{%Y-%m-%d %H:%M:%S.%f}]%T%t%T%N%T[%p]%T[%c]%T%f:%l%T%m%n"
+    appenders:
+      - type: FileLogAppender
+        file: /home/chen/workspace/AuthServer/logs/access.log
+      - type: StdoutLogAppender
+  - name: auth
+    level: info
+    formatter: "[%d{%Y-%m-%d %H:%M:%S.%f}]%T%t%T%N%T[%p]%T[%c]%T%f:%l%T%m%n"
+    appenders:
+      - type: FileLogAppender
+        file: /home/chen/workspace/AuthServer/logs/auth.log
+      - type: StdoutLogAppender
+
+# Redis configuration for Fox Thread, defining the Redis settings for the Fox Thread component, including the name, number of connections, and advance settings.
+fox_thread:
+  redis:
+    name: redis
+    num: 1
+    advance: 0
+
+# Redis configuration for the blog, defining the host, type, pool size, and timeout settings for the Redis connection used by the blog.
+redis:
+  config:
+    blog:
+      host: 127.0.0.1:6379
+      type: fox_redis
+      pool: 1
+      timeout: 100
+    auth:
+      host: 127.0.0.1:6379
+      type: fox_redis
+      pool: 2
+      timeout: 100
+  desc: "type: redis,redis_cluster,fox_redis,fox_redis_cluster"
+
+# OIDC 认证服务配置
+auth:
+  issuer: "http://localhost:8090"
+  key:
+    kid: "rsa1"
+    private_key_path: "/home/chen/workspace/AuthServer/conf/keys/private.pem"
+    public_key_path: "/home/chen/workspace/AuthServer/conf/keys/public.pem"
+  token:
+    access_token_ttl: 3600
+    id_token_ttl: 3600
+    refresh_token_ttl: 2592000
+    auth_code_ttl: 300
+  session_ttl: 86400
+
+# MySQL 配置
+mysql:
+  auth:
+    host: 127.0.0.1:3306
+    user: root
+    passwd: your_password
+    dbname: auth_server
+    pool: 2
+    charset: utf8mb4
