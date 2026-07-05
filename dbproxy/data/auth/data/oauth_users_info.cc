@@ -44,64 +44,147 @@ std::string OauthUsersInfo::toJsonString() const {
 
 void OauthUsersInfo::setId(const int64_t& v) {
     m_id = v;
+    m_flags |= (1ull << 0);
 }
 
 void OauthUsersInfo::setUsername(const std::string& v) {
     m_username = v;
+    m_flags |= (1ull << 1);
 }
 
 void OauthUsersInfo::setEmail(const std::string& v) {
     m_email = v;
+    m_flags |= (1ull << 2);
 }
 
 void OauthUsersInfo::setPasswordHash(const std::string& v) {
     m_passwordHash = v;
+    m_flags |= (1ull << 3);
 }
 
 void OauthUsersInfo::setDisplayName(const std::string& v) {
     m_displayName = v;
+    m_flags |= (1ull << 4);
 }
 
 void OauthUsersInfo::setAvatarUrl(const std::string& v) {
     m_avatarUrl = v;
+    m_flags |= (1ull << 5);
 }
 
 void OauthUsersInfo::setEmailVerified(const int32_t& v) {
     m_emailVerified = v;
+    m_flags |= (1ull << 6);
 }
 
 void OauthUsersInfo::setEnabled(const int32_t& v) {
     m_enabled = v;
+    m_flags |= (1ull << 7);
 }
 
 void OauthUsersInfo::setCreateTime(const int64_t& v) {
     m_createTime = v;
+    m_flags |= (1ull << 8);
 }
 
 void OauthUsersInfo::setUpdateTime(const int64_t& v) {
     m_updateTime = v;
+    m_flags |= (1ull << 9);
 }
 
 
 int OauthUsersInfoDao::Update(OauthUsersInfo::ptr info, chen::IDB::ptr conn) {
-    std::string sql = "update oauth_users set username = ?, email = ?, password_hash = ?, display_name = ?, avatar_url = ?, email_verified = ?, enabled = ?, create_time = ?, update_time = ? where id = ?";
+    if (!info->isDirty()) {
+        return 0;
+    }
+    std::string sql = "update oauth_users set ";
+    bool first = true;
+    if (info->m_flags & (1ull << 1)) {
+        if (!first) sql += ", ";
+        sql += "username = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 2)) {
+        if (!first) sql += ", ";
+        sql += "email = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 3)) {
+        if (!first) sql += ", ";
+        sql += "password_hash = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 4)) {
+        if (!first) sql += ", ";
+        sql += "display_name = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 5)) {
+        if (!first) sql += ", ";
+        sql += "avatar_url = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 6)) {
+        if (!first) sql += ", ";
+        sql += "email_verified = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 7)) {
+        if (!first) sql += ", ";
+        sql += "enabled = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 8)) {
+        if (!first) sql += ", ";
+        sql += "create_time = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 9)) {
+        if (!first) sql += ", ";
+        sql += "update_time = ?";
+        first = false;
+    }
+    sql += " where id = ?";
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
-    stmt->bindString(1, info->m_username);
-    stmt->bindString(2, info->m_email);
-    stmt->bindString(3, info->m_passwordHash);
-    stmt->bindString(4, info->m_displayName);
-    stmt->bindString(5, info->m_avatarUrl);
-    stmt->bindInt32(6, info->m_emailVerified);
-    stmt->bindInt32(7, info->m_enabled);
-    stmt->bindTime(8, info->m_createTime);
-    stmt->bindTime(9, info->m_updateTime);
-    stmt->bindInt64(10, info->m_id);
-    return stmt->execute();
+    int idx = 1;
+    if (info->m_flags & (1ull << 1)) {
+        stmt->bindString(idx++, info->m_username);
+    }
+    if (info->m_flags & (1ull << 2)) {
+        stmt->bindString(idx++, info->m_email);
+    }
+    if (info->m_flags & (1ull << 3)) {
+        stmt->bindString(idx++, info->m_passwordHash);
+    }
+    if (info->m_flags & (1ull << 4)) {
+        stmt->bindString(idx++, info->m_displayName);
+    }
+    if (info->m_flags & (1ull << 5)) {
+        stmt->bindString(idx++, info->m_avatarUrl);
+    }
+    if (info->m_flags & (1ull << 6)) {
+        stmt->bindInt32(idx++, info->m_emailVerified);
+    }
+    if (info->m_flags & (1ull << 7)) {
+        stmt->bindInt32(idx++, info->m_enabled);
+    }
+    if (info->m_flags & (1ull << 8)) {
+        stmt->bindTime(idx++, info->m_createTime);
+    }
+    if (info->m_flags & (1ull << 9)) {
+        stmt->bindTime(idx++, info->m_updateTime);
+    }
+    stmt->bindInt64(idx++, info->m_id);
+    int rt = stmt->execute();
+    if (rt == 0) {
+        info->markClean();
+    }
+    return rt;
 }
 
 int OauthUsersInfoDao::Insert(OauthUsersInfo::ptr info, chen::IDB::ptr conn) {
@@ -109,7 +192,7 @@ int OauthUsersInfoDao::Insert(OauthUsersInfo::ptr info, chen::IDB::ptr conn) {
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindString(1, info->m_username);
@@ -125,6 +208,9 @@ int OauthUsersInfoDao::Insert(OauthUsersInfo::ptr info, chen::IDB::ptr conn) {
     if(rt == 0) {
         info->m_id = conn->getLastInsertId();
     }
+    if (rt == 0) {
+        info->markClean();
+    }
     return rt;
 }
 
@@ -136,7 +222,7 @@ int OauthUsersInfoDao::InsertOrUpdate(OauthUsersInfo::ptr info, chen::IDB::ptr c
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, info->m_id);
@@ -149,6 +235,131 @@ int OauthUsersInfoDao::InsertOrUpdate(OauthUsersInfo::ptr info, chen::IDB::ptr c
     stmt->bindInt32(8, info->m_enabled);
     stmt->bindTime(9, info->m_createTime);
     stmt->bindTime(10, info->m_updateTime);
+    int rt = stmt->execute();
+    if (rt == 0) {
+        info->markClean();
+    }
+    return rt;
+}
+
+int OauthUsersInfoDao::BatchInsert(const std::vector<OauthUsersInfo::ptr>& infos, chen::IDB::ptr conn) {
+    if (infos.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchInsert conn is null";
+        return -1;
+    }
+    std::string sql = "insert into oauth_users (";
+    sql += "username";
+    sql += ", ";
+    sql += "email";
+    sql += ", ";
+    sql += "password_hash";
+    sql += ", ";
+    sql += "display_name";
+    sql += ", ";
+    sql += "avatar_url";
+    sql += ", ";
+    sql += "email_verified";
+    sql += ", ";
+    sql += "enabled";
+    sql += ", ";
+    sql += "create_time";
+    sql += ", ";
+    sql += "update_time";
+    sql += ") VALUES ";
+    for (size_t r = 0; r < infos.size(); ++r) {
+        if (r) sql += ", ";
+        sql += "(";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ")";
+    }
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    int idx = 1;
+    for (auto& info : infos) {
+        stmt->bindString(idx++, info->m_username);
+        stmt->bindString(idx++, info->m_email);
+        stmt->bindString(idx++, info->m_passwordHash);
+        stmt->bindString(idx++, info->m_displayName);
+        stmt->bindString(idx++, info->m_avatarUrl);
+        stmt->bindInt32(idx++, info->m_emailVerified);
+        stmt->bindInt32(idx++, info->m_enabled);
+        stmt->bindTime(idx++, info->m_createTime);
+        stmt->bindTime(idx++, info->m_updateTime);
+    }
+    return stmt->execute();
+}
+
+int OauthUsersInfoDao::BatchUpdate(const std::vector<OauthUsersInfo::ptr>& infos, chen::IDB::ptr conn) {
+    if (infos.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchUpdate conn is null";
+        return -1;
+    }
+    auto trans = conn->openTransaction(true);
+    if (!trans || !trans->begin()) {
+        ERROR(logger) << "BatchUpdate begin transaction failed";
+        return -1;
+    }
+    for (auto& info : infos) {
+        if (Update(info, conn)) {
+            ERROR(logger) << "BatchUpdate Update failed";
+            trans->rollback();
+            return conn->getErrno();
+        }
+    }
+    trans->commit();
+    return 0;
+}
+
+int OauthUsersInfoDao::BatchDelete(const std::vector<int64_t>& ids, chen::IDB::ptr conn) {
+    if (ids.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchDelete conn is null";
+        return -1;
+    }
+    std::string sql = "delete from oauth_users where id IN (";
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i) sql += ", ";
+        sql += "?";
+    }
+    sql += ")";
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    int idx = 1;
+    for (auto& id : ids) {
+        stmt->bindInt64(idx++, id);
+    }
     return stmt->execute();
 }
 
@@ -157,7 +368,7 @@ int OauthUsersInfoDao::Delete(OauthUsersInfo::ptr info, chen::IDB::ptr conn) {
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, info->m_id);
@@ -169,7 +380,7 @@ int OauthUsersInfoDao::DeleteById( const int64_t& id, chen::IDB::ptr conn) {
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, id);
@@ -181,7 +392,7 @@ int OauthUsersInfoDao::DeleteByUsername( const std::string& username, chen::IDB:
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindString(1, username);
@@ -193,7 +404,7 @@ int OauthUsersInfoDao::DeleteByEmail( const std::string& email, chen::IDB::ptr c
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindString(1, email);
@@ -205,7 +416,7 @@ int OauthUsersInfoDao::QueryAll(std::vector<OauthUsersInfo::ptr>& results, chen:
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     auto rt = stmt->query();
@@ -234,7 +445,7 @@ OauthUsersInfo::ptr OauthUsersInfoDao::Query( const int64_t& id, chen::IDB::ptr 
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return nullptr;
     }
     stmt->bindInt64(1, id);
@@ -264,7 +475,7 @@ OauthUsersInfo::ptr OauthUsersInfoDao::QueryByUsername( const std::string& usern
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return nullptr;
     }
     stmt->bindString(1, username);
@@ -294,7 +505,7 @@ OauthUsersInfo::ptr OauthUsersInfoDao::QueryByEmail( const std::string& email, c
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return nullptr;
     }
     stmt->bindString(1, email);
@@ -317,6 +528,118 @@ OauthUsersInfo::ptr OauthUsersInfoDao::QueryByEmail( const std::string& email, c
     v->m_createTime = rt->getTime(8);
     v->m_updateTime = rt->getTime(9);
     return v;
+}
+
+OauthUsersInfo::ptr OauthUsersInfoDao::ParseRow(chen::ISQLData::ptr data) {
+    if (!data) {
+        ERROR(logger) << "ParseRow data is null";
+        return nullptr;
+    }
+    OauthUsersInfo::ptr v(new OauthUsersInfo);
+    v->m_id = data->getInt64(0);
+    v->m_username = data->getString(1);
+    v->m_email = data->getString(2);
+    v->m_passwordHash = data->getString(3);
+    v->m_displayName = data->getString(4);
+    v->m_avatarUrl = data->getString(5);
+    v->m_emailVerified = data->getInt32(6);
+    v->m_enabled = data->getInt32(7);
+    v->m_createTime = data->getTime(8);
+    v->m_updateTime = data->getTime(9);
+    return v;
+}
+
+int OauthUsersInfoDao::QueryByBuilder(std::vector<OauthUsersInfo::ptr>& results, chen::QueryBuilder::ptr qb, chen::IDB::ptr conn) {
+    if (!qb || !conn) {
+        ERROR(logger) << "QueryByBuilder qb or conn is null";
+        return -1;
+    }
+    std::string sql = qb->buildQuerySQL("id, username, email, password_hash, display_name, avatar_url, email_verified, enabled, create_time, update_time");
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindParams(stmt);
+    auto rt = stmt->query();
+    if(!rt) {
+        return stmt->getErrno();
+    }
+    while (rt->next()) {
+        OauthUsersInfo::ptr v(new OauthUsersInfo);
+        v->m_id = rt->getInt64(0);
+        v->m_username = rt->getString(1);
+        v->m_email = rt->getString(2);
+        v->m_passwordHash = rt->getString(3);
+        v->m_displayName = rt->getString(4);
+        v->m_avatarUrl = rt->getString(5);
+        v->m_emailVerified = rt->getInt32(6);
+        v->m_enabled = rt->getInt32(7);
+        v->m_createTime = rt->getTime(8);
+        v->m_updateTime = rt->getTime(9);
+        results.push_back(v);
+    }
+    return 0;
+}
+
+int OauthUsersInfoDao::QueryByBuilderPages(std::vector<OauthUsersInfo::ptr>& results, int64_t& total, chen::QueryBuilder::ptr qb, int32_t offset, int32_t limit, chen::IDB::ptr conn) {
+    if (!qb || !conn) {
+        ERROR(logger) << "QueryByBuilderPages qb or conn is null";
+        return -1;
+    }
+    std::string countSql = qb->buildCountSQL();
+    auto countStmt = conn->prepare(countSql);
+    if (!countStmt) {
+        ERROR(logger) << "stmt=" << countSql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindQueryParams(countStmt);
+    auto countRt = countStmt->query();
+    if (!countRt) {
+        return countStmt->getErrno();
+    }
+    if (countRt->next()) {
+        total = countRt->getInt64(0);
+    }
+    if (total == 0) {
+        return 0;
+    }
+    std::string sql = qb->buildQuerySQL("id, username, email, password_hash, display_name, avatar_url, email_verified, enabled, create_time, update_time", false);
+    if (!qb->hasOrderBy()) {
+        sql += " order by id desc";
+    }
+    sql += " limit ? offset ?";
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindQueryParams(stmt);
+    int idx = qb->getQueryParamCount() + 1;
+    stmt->bindInt32(idx++, limit);
+    stmt->bindInt32(idx++, offset);
+    auto rt = stmt->query();
+    if (!rt) {
+        return 0;
+    }
+    while (rt->next()) {
+        OauthUsersInfo::ptr v(new OauthUsersInfo);
+        v->m_id = rt->getInt64(0);
+        v->m_username = rt->getString(1);
+        v->m_email = rt->getString(2);
+        v->m_passwordHash = rt->getString(3);
+        v->m_displayName = rt->getString(4);
+        v->m_avatarUrl = rt->getString(5);
+        v->m_emailVerified = rt->getInt32(6);
+        v->m_enabled = rt->getInt32(7);
+        v->m_createTime = rt->getTime(8);
+        v->m_updateTime = rt->getTime(9);
+        results.push_back(v);
+    }
+    return 0;
 }
 
 int OauthUsersInfoDao::CreateTableSQLite3(chen::IDB::ptr conn) {
@@ -351,6 +674,53 @@ int OauthUsersInfoDao::CreateTableMySQL(chen::IDB::ptr conn) {
             "PRIMARY KEY(`id`),"
             "UNIQUE KEY `oauth_users_username` (`username`),"
             "UNIQUE KEY `oauth_users_email` (`email`)) COMMENT='OIDC 用户表'");
+}
+
+int OauthUsersInfoDao::Migrate(chen::IDB::ptr conn) {
+    if (!conn) {
+        ERROR(logger) << "Migrate conn is null";
+        return -1;
+    }
+
+    conn->execute("CREATE TABLE IF NOT EXISTS schema_version ("
+        "table_name VARCHAR(128) PRIMARY KEY, "
+        "version INT NOT NULL DEFAULT 0)");
+
+    auto verStmt = conn->prepare("SELECT version FROM schema_version WHERE table_name = ?");
+    if (!verStmt) {
+        ERROR(logger) << "Migrate prepare version query failed errno=" << conn->getErrno();
+        return conn->getErrno();
+    }
+    verStmt->bindString(1, "oauth_users");
+    auto verRt = verStmt->query();
+    int dbVer = 0;
+    if (verRt && verRt->next()) {
+        dbVer = (int)verRt->getInt64(0);
+    }
+
+    if (dbVer < 1) {
+        if (CreateTableSQLite3(conn)) {
+            ERROR(logger) << "Migrate v1 CreateTable failed";
+            return conn->getErrno();
+        }
+    }
+
+    if (dbVer == 0) {
+        auto insStmt = conn->prepare("INSERT INTO schema_version (table_name, version) VALUES (?, ?)");
+        if (insStmt) {
+            insStmt->bindString(1, "oauth_users");
+            insStmt->bindInt32(2, 1);
+            insStmt->execute();
+        }
+    } else {
+        auto updStmt = conn->prepare("UPDATE schema_version SET version = ? WHERE table_name = ?");
+        if (updStmt) {
+            updStmt->bindInt32(1, 1);
+            updStmt->bindString(2, "oauth_users");
+            updStmt->execute();
+        }
+    }
+    return 0;
 }
 
 int OauthUsersInfoDao::MigrateTableSQLite3(chen::IDB::ptr conn) {

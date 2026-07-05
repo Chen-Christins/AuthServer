@@ -8,12 +8,16 @@
 #include <vector>
 
 #include <chen/db/db.h>
+#include <chen/db/query_builder.h>
 #include <chen/util/util.h>
 
 namespace auth {
 namespace data {
 
 class OauthUsersInfoDao;
+/**
+ * @brief OIDC 用户表
+ */
 class OauthUsersInfo {
 friend class OauthUsersInfoDao;
 public:
@@ -21,37 +25,129 @@ public:
 
     OauthUsersInfo();
 
+    /**
+     * @brief 获取主键
+     * @return 主键
+     */
     const int64_t& getId() { return m_id; }
+    /**
+     * @brief 设置主键
+     * @param v 主键
+     */
     void setId(const int64_t& v);
 
+    /**
+     * @brief 获取用户名
+     * @return 用户名
+     */
     const std::string& getUsername() { return m_username; }
+    /**
+     * @brief 设置用户名
+     * @param v 用户名
+     */
     void setUsername(const std::string& v);
 
+    /**
+     * @brief 获取邮箱
+     * @return 邮箱
+     */
     const std::string& getEmail() { return m_email; }
+    /**
+     * @brief 设置邮箱
+     * @param v 邮箱
+     */
     void setEmail(const std::string& v);
 
+    /**
+     * @brief 获取bcrypt 密码哈希
+     * @return bcrypt 密码哈希
+     */
     const std::string& getPasswordHash() { return m_passwordHash; }
+    /**
+     * @brief 设置bcrypt 密码哈希
+     * @param v bcrypt 密码哈希
+     */
     void setPasswordHash(const std::string& v);
 
+    /**
+     * @brief 获取显示名称
+     * @return 显示名称
+     */
     const std::string& getDisplayName() { return m_displayName; }
+    /**
+     * @brief 设置显示名称
+     * @param v 显示名称
+     */
     void setDisplayName(const std::string& v);
 
+    /**
+     * @brief 获取头像 URL
+     * @return 头像 URL
+     */
     const std::string& getAvatarUrl() { return m_avatarUrl; }
+    /**
+     * @brief 设置头像 URL
+     * @param v 头像 URL
+     */
     void setAvatarUrl(const std::string& v);
 
+    /**
+     * @brief 获取邮箱是否已验证
+     * @return 邮箱是否已验证
+     */
     const int32_t& getEmailVerified() { return m_emailVerified; }
+    /**
+     * @brief 设置邮箱是否已验证
+     * @param v 邮箱是否已验证
+     */
     void setEmailVerified(const int32_t& v);
 
+    /**
+     * @brief 获取是否启用
+     * @return 是否启用
+     */
     const int32_t& getEnabled() { return m_enabled; }
+    /**
+     * @brief 设置是否启用
+     * @param v 是否启用
+     */
     void setEnabled(const int32_t& v);
 
+    /**
+     * @brief 获取创建时间
+     * @return 创建时间
+     */
     const int64_t& getCreateTime() { return m_createTime; }
+    /**
+     * @brief 设置创建时间
+     * @param v 创建时间
+     */
     void setCreateTime(const int64_t& v);
 
+    /**
+     * @brief 获取更新时间
+     * @return 更新时间
+     */
     const int64_t& getUpdateTime() { return m_updateTime; }
+    /**
+     * @brief 设置更新时间
+     * @param v 更新时间
+     */
     void setUpdateTime(const int64_t& v);
 
+    /**
+     * @brief 转为 JSON 字符串
+     * @return JSON 字符串
+     */
     std::string toJsonString() const;
+
+    /** @brief 清除脏标记（Update 成功后自动调用） */
+    void markClean() { m_flags = 0; }
+    /**
+     * @brief 是否有字段被修改过
+     * @return true 有未保存的修改，false 无修改
+     */
+    bool isDirty() const { return m_flags != 0; }
 
 private:
     int32_t m_emailVerified;
@@ -64,6 +160,7 @@ private:
     std::string m_avatarUrl;
     int64_t m_createTime;
     int64_t m_updateTime;
+    uint64_t m_flags = 0;
 };
 
 
@@ -73,6 +170,9 @@ public:
     static int Update(OauthUsersInfo::ptr info, chen::IDB::ptr conn);
     static int Insert(OauthUsersInfo::ptr info, chen::IDB::ptr conn);
     static int InsertOrUpdate(OauthUsersInfo::ptr info, chen::IDB::ptr conn);
+    static int BatchInsert(const std::vector<OauthUsersInfo::ptr>& infos, chen::IDB::ptr conn);
+    static int BatchUpdate(const std::vector<OauthUsersInfo::ptr>& infos, chen::IDB::ptr conn);
+    static int BatchDelete(const std::vector<int64_t>& ids, chen::IDB::ptr conn);
     static int Delete(OauthUsersInfo::ptr info, chen::IDB::ptr conn);
     static int Delete(const int64_t& id, chen::IDB::ptr conn);
     static int DeleteById( const int64_t& id, chen::IDB::ptr conn);
@@ -86,6 +186,10 @@ public:
     static int CreateTableMySQL(chen::IDB::ptr info);
     static int MigrateTableSQLite3(chen::IDB::ptr info);
     static int MigrateTableMySQL(chen::IDB::ptr info);
+    static int Migrate(chen::IDB::ptr conn);
+    static OauthUsersInfo::ptr ParseRow(chen::ISQLData::ptr data);
+    static int QueryByBuilder(std::vector<OauthUsersInfo::ptr>& results, chen::QueryBuilder::ptr qb, chen::IDB::ptr conn);
+    static int QueryByBuilderPages(std::vector<OauthUsersInfo::ptr>& results, int64_t& total, chen::QueryBuilder::ptr qb, int32_t offset, int32_t limit, chen::IDB::ptr conn);
 };
 
 } //namespace data

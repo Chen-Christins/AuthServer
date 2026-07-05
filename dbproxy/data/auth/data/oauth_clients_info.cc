@@ -48,74 +48,173 @@ std::string OauthClientsInfo::toJsonString() const {
 
 void OauthClientsInfo::setId(const int64_t& v) {
     m_id = v;
+    m_flags |= (1ull << 0);
 }
 
 void OauthClientsInfo::setClientId(const std::string& v) {
     m_clientId = v;
+    m_flags |= (1ull << 1);
 }
 
 void OauthClientsInfo::setClientSecretHash(const std::string& v) {
     m_clientSecretHash = v;
+    m_flags |= (1ull << 2);
 }
 
 void OauthClientsInfo::setClientName(const std::string& v) {
     m_clientName = v;
+    m_flags |= (1ull << 3);
 }
 
 void OauthClientsInfo::setRedirectUris(const std::string& v) {
     m_redirectUris = v;
+    m_flags |= (1ull << 4);
 }
 
 void OauthClientsInfo::setGrantTypes(const std::string& v) {
     m_grantTypes = v;
+    m_flags |= (1ull << 5);
 }
 
 void OauthClientsInfo::setAllowedScopes(const std::string& v) {
     m_allowedScopes = v;
+    m_flags |= (1ull << 6);
 }
 
 void OauthClientsInfo::setClientUri(const std::string& v) {
     m_clientUri = v;
+    m_flags |= (1ull << 7);
 }
 
 void OauthClientsInfo::setLogoUri(const std::string& v) {
     m_logoUri = v;
+    m_flags |= (1ull << 8);
 }
 
 void OauthClientsInfo::setEnabled(const int32_t& v) {
     m_enabled = v;
+    m_flags |= (1ull << 9);
 }
 
 void OauthClientsInfo::setCreateTime(const int64_t& v) {
     m_createTime = v;
+    m_flags |= (1ull << 10);
 }
 
 void OauthClientsInfo::setUpdateTime(const int64_t& v) {
     m_updateTime = v;
+    m_flags |= (1ull << 11);
 }
 
 
 int OauthClientsInfoDao::Update(OauthClientsInfo::ptr info, chen::IDB::ptr conn) {
-    std::string sql = "update oauth_clients set client_id = ?, client_secret_hash = ?, client_name = ?, redirect_uris = ?, grant_types = ?, allowed_scopes = ?, client_uri = ?, logo_uri = ?, enabled = ?, create_time = ?, update_time = ? where id = ?";
+    if (!info->isDirty()) {
+        return 0;
+    }
+    std::string sql = "update oauth_clients set ";
+    bool first = true;
+    if (info->m_flags & (1ull << 1)) {
+        if (!first) sql += ", ";
+        sql += "client_id = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 2)) {
+        if (!first) sql += ", ";
+        sql += "client_secret_hash = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 3)) {
+        if (!first) sql += ", ";
+        sql += "client_name = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 4)) {
+        if (!first) sql += ", ";
+        sql += "redirect_uris = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 5)) {
+        if (!first) sql += ", ";
+        sql += "grant_types = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 6)) {
+        if (!first) sql += ", ";
+        sql += "allowed_scopes = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 7)) {
+        if (!first) sql += ", ";
+        sql += "client_uri = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 8)) {
+        if (!first) sql += ", ";
+        sql += "logo_uri = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 9)) {
+        if (!first) sql += ", ";
+        sql += "enabled = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 10)) {
+        if (!first) sql += ", ";
+        sql += "create_time = ?";
+        first = false;
+    }
+    if (info->m_flags & (1ull << 11)) {
+        if (!first) sql += ", ";
+        sql += "update_time = ?";
+        first = false;
+    }
+    sql += " where id = ?";
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
-    stmt->bindString(1, info->m_clientId);
-    stmt->bindString(2, info->m_clientSecretHash);
-    stmt->bindString(3, info->m_clientName);
-    stmt->bindString(4, info->m_redirectUris);
-    stmt->bindString(5, info->m_grantTypes);
-    stmt->bindString(6, info->m_allowedScopes);
-    stmt->bindString(7, info->m_clientUri);
-    stmt->bindString(8, info->m_logoUri);
-    stmt->bindInt32(9, info->m_enabled);
-    stmt->bindTime(10, info->m_createTime);
-    stmt->bindTime(11, info->m_updateTime);
-    stmt->bindInt64(12, info->m_id);
-    return stmt->execute();
+    int idx = 1;
+    if (info->m_flags & (1ull << 1)) {
+        stmt->bindString(idx++, info->m_clientId);
+    }
+    if (info->m_flags & (1ull << 2)) {
+        stmt->bindString(idx++, info->m_clientSecretHash);
+    }
+    if (info->m_flags & (1ull << 3)) {
+        stmt->bindString(idx++, info->m_clientName);
+    }
+    if (info->m_flags & (1ull << 4)) {
+        stmt->bindString(idx++, info->m_redirectUris);
+    }
+    if (info->m_flags & (1ull << 5)) {
+        stmt->bindString(idx++, info->m_grantTypes);
+    }
+    if (info->m_flags & (1ull << 6)) {
+        stmt->bindString(idx++, info->m_allowedScopes);
+    }
+    if (info->m_flags & (1ull << 7)) {
+        stmt->bindString(idx++, info->m_clientUri);
+    }
+    if (info->m_flags & (1ull << 8)) {
+        stmt->bindString(idx++, info->m_logoUri);
+    }
+    if (info->m_flags & (1ull << 9)) {
+        stmt->bindInt32(idx++, info->m_enabled);
+    }
+    if (info->m_flags & (1ull << 10)) {
+        stmt->bindTime(idx++, info->m_createTime);
+    }
+    if (info->m_flags & (1ull << 11)) {
+        stmt->bindTime(idx++, info->m_updateTime);
+    }
+    stmt->bindInt64(idx++, info->m_id);
+    int rt = stmt->execute();
+    if (rt == 0) {
+        info->markClean();
+    }
+    return rt;
 }
 
 int OauthClientsInfoDao::Insert(OauthClientsInfo::ptr info, chen::IDB::ptr conn) {
@@ -123,7 +222,7 @@ int OauthClientsInfoDao::Insert(OauthClientsInfo::ptr info, chen::IDB::ptr conn)
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindString(1, info->m_clientId);
@@ -141,6 +240,9 @@ int OauthClientsInfoDao::Insert(OauthClientsInfo::ptr info, chen::IDB::ptr conn)
     if(rt == 0) {
         info->m_id = conn->getLastInsertId();
     }
+    if (rt == 0) {
+        info->markClean();
+    }
     return rt;
 }
 
@@ -152,7 +254,7 @@ int OauthClientsInfoDao::InsertOrUpdate(OauthClientsInfo::ptr info, chen::IDB::p
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, info->m_id);
@@ -167,6 +269,141 @@ int OauthClientsInfoDao::InsertOrUpdate(OauthClientsInfo::ptr info, chen::IDB::p
     stmt->bindInt32(10, info->m_enabled);
     stmt->bindTime(11, info->m_createTime);
     stmt->bindTime(12, info->m_updateTime);
+    int rt = stmt->execute();
+    if (rt == 0) {
+        info->markClean();
+    }
+    return rt;
+}
+
+int OauthClientsInfoDao::BatchInsert(const std::vector<OauthClientsInfo::ptr>& infos, chen::IDB::ptr conn) {
+    if (infos.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchInsert conn is null";
+        return -1;
+    }
+    std::string sql = "insert into oauth_clients (";
+    sql += "client_id";
+    sql += ", ";
+    sql += "client_secret_hash";
+    sql += ", ";
+    sql += "client_name";
+    sql += ", ";
+    sql += "redirect_uris";
+    sql += ", ";
+    sql += "grant_types";
+    sql += ", ";
+    sql += "allowed_scopes";
+    sql += ", ";
+    sql += "client_uri";
+    sql += ", ";
+    sql += "logo_uri";
+    sql += ", ";
+    sql += "enabled";
+    sql += ", ";
+    sql += "create_time";
+    sql += ", ";
+    sql += "update_time";
+    sql += ") VALUES ";
+    for (size_t r = 0; r < infos.size(); ++r) {
+        if (r) sql += ", ";
+        sql += "(";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ", ";
+        sql += "?";
+        sql += ")";
+    }
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    int idx = 1;
+    for (auto& info : infos) {
+        stmt->bindString(idx++, info->m_clientId);
+        stmt->bindString(idx++, info->m_clientSecretHash);
+        stmt->bindString(idx++, info->m_clientName);
+        stmt->bindString(idx++, info->m_redirectUris);
+        stmt->bindString(idx++, info->m_grantTypes);
+        stmt->bindString(idx++, info->m_allowedScopes);
+        stmt->bindString(idx++, info->m_clientUri);
+        stmt->bindString(idx++, info->m_logoUri);
+        stmt->bindInt32(idx++, info->m_enabled);
+        stmt->bindTime(idx++, info->m_createTime);
+        stmt->bindTime(idx++, info->m_updateTime);
+    }
+    return stmt->execute();
+}
+
+int OauthClientsInfoDao::BatchUpdate(const std::vector<OauthClientsInfo::ptr>& infos, chen::IDB::ptr conn) {
+    if (infos.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchUpdate conn is null";
+        return -1;
+    }
+    auto trans = conn->openTransaction(true);
+    if (!trans || !trans->begin()) {
+        ERROR(logger) << "BatchUpdate begin transaction failed";
+        return -1;
+    }
+    for (auto& info : infos) {
+        if (Update(info, conn)) {
+            ERROR(logger) << "BatchUpdate Update failed";
+            trans->rollback();
+            return conn->getErrno();
+        }
+    }
+    trans->commit();
+    return 0;
+}
+
+int OauthClientsInfoDao::BatchDelete(const std::vector<int64_t>& ids, chen::IDB::ptr conn) {
+    if (ids.empty()) {
+        return 0;
+    }
+    if (!conn) {
+        ERROR(logger) << "BatchDelete conn is null";
+        return -1;
+    }
+    std::string sql = "delete from oauth_clients where id IN (";
+    for (size_t i = 0; i < ids.size(); ++i) {
+        if (i) sql += ", ";
+        sql += "?";
+    }
+    sql += ")";
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    int idx = 1;
+    for (auto& id : ids) {
+        stmt->bindInt64(idx++, id);
+    }
     return stmt->execute();
 }
 
@@ -175,7 +412,7 @@ int OauthClientsInfoDao::Delete(OauthClientsInfo::ptr info, chen::IDB::ptr conn)
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, info->m_id);
@@ -187,7 +424,7 @@ int OauthClientsInfoDao::DeleteById( const int64_t& id, chen::IDB::ptr conn) {
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindInt64(1, id);
@@ -199,7 +436,7 @@ int OauthClientsInfoDao::DeleteByClientId( const std::string& client_id, chen::I
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     stmt->bindString(1, client_id);
@@ -211,7 +448,7 @@ int OauthClientsInfoDao::QueryAll(std::vector<OauthClientsInfo::ptr>& results, c
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return conn->getErrno();
     }
     auto rt = stmt->query();
@@ -242,7 +479,7 @@ OauthClientsInfo::ptr OauthClientsInfoDao::Query( const int64_t& id, chen::IDB::
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return nullptr;
     }
     stmt->bindInt64(1, id);
@@ -274,7 +511,7 @@ OauthClientsInfo::ptr OauthClientsInfoDao::QueryByClientId( const std::string& c
     auto stmt = conn->prepare(sql);
     if(!stmt) {
         ERROR(logger) << "stmt=" << sql
-                 << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
         return nullptr;
     }
     stmt->bindString(1, client_id);
@@ -299,6 +536,124 @@ OauthClientsInfo::ptr OauthClientsInfoDao::QueryByClientId( const std::string& c
     v->m_createTime = rt->getTime(10);
     v->m_updateTime = rt->getTime(11);
     return v;
+}
+
+OauthClientsInfo::ptr OauthClientsInfoDao::ParseRow(chen::ISQLData::ptr data) {
+    if (!data) {
+        ERROR(logger) << "ParseRow data is null";
+        return nullptr;
+    }
+    OauthClientsInfo::ptr v(new OauthClientsInfo);
+    v->m_id = data->getInt64(0);
+    v->m_clientId = data->getString(1);
+    v->m_clientSecretHash = data->getString(2);
+    v->m_clientName = data->getString(3);
+    v->m_redirectUris = data->getString(4);
+    v->m_grantTypes = data->getString(5);
+    v->m_allowedScopes = data->getString(6);
+    v->m_clientUri = data->getString(7);
+    v->m_logoUri = data->getString(8);
+    v->m_enabled = data->getInt32(9);
+    v->m_createTime = data->getTime(10);
+    v->m_updateTime = data->getTime(11);
+    return v;
+}
+
+int OauthClientsInfoDao::QueryByBuilder(std::vector<OauthClientsInfo::ptr>& results, chen::QueryBuilder::ptr qb, chen::IDB::ptr conn) {
+    if (!qb || !conn) {
+        ERROR(logger) << "QueryByBuilder qb or conn is null";
+        return -1;
+    }
+    std::string sql = qb->buildQuerySQL("id, client_id, client_secret_hash, client_name, redirect_uris, grant_types, allowed_scopes, client_uri, logo_uri, enabled, create_time, update_time");
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindParams(stmt);
+    auto rt = stmt->query();
+    if(!rt) {
+        return stmt->getErrno();
+    }
+    while (rt->next()) {
+        OauthClientsInfo::ptr v(new OauthClientsInfo);
+        v->m_id = rt->getInt64(0);
+        v->m_clientId = rt->getString(1);
+        v->m_clientSecretHash = rt->getString(2);
+        v->m_clientName = rt->getString(3);
+        v->m_redirectUris = rt->getString(4);
+        v->m_grantTypes = rt->getString(5);
+        v->m_allowedScopes = rt->getString(6);
+        v->m_clientUri = rt->getString(7);
+        v->m_logoUri = rt->getString(8);
+        v->m_enabled = rt->getInt32(9);
+        v->m_createTime = rt->getTime(10);
+        v->m_updateTime = rt->getTime(11);
+        results.push_back(v);
+    }
+    return 0;
+}
+
+int OauthClientsInfoDao::QueryByBuilderPages(std::vector<OauthClientsInfo::ptr>& results, int64_t& total, chen::QueryBuilder::ptr qb, int32_t offset, int32_t limit, chen::IDB::ptr conn) {
+    if (!qb || !conn) {
+        ERROR(logger) << "QueryByBuilderPages qb or conn is null";
+        return -1;
+    }
+    std::string countSql = qb->buildCountSQL();
+    auto countStmt = conn->prepare(countSql);
+    if (!countStmt) {
+        ERROR(logger) << "stmt=" << countSql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindQueryParams(countStmt);
+    auto countRt = countStmt->query();
+    if (!countRt) {
+        return countStmt->getErrno();
+    }
+    if (countRt->next()) {
+        total = countRt->getInt64(0);
+    }
+    if (total == 0) {
+        return 0;
+    }
+    std::string sql = qb->buildQuerySQL("id, client_id, client_secret_hash, client_name, redirect_uris, grant_types, allowed_scopes, client_uri, logo_uri, enabled, create_time, update_time", false);
+    if (!qb->hasOrderBy()) {
+        sql += " order by id desc";
+    }
+    sql += " limit ? offset ?";
+    auto stmt = conn->prepare(sql);
+    if(!stmt) {
+        ERROR(logger) << "stmt=" << sql
+            << " errno=" << conn->getErrno() << " errstr=" << conn->getErrStr();
+        return conn->getErrno();
+    }
+    qb->bindQueryParams(stmt);
+    int idx = qb->getQueryParamCount() + 1;
+    stmt->bindInt32(idx++, limit);
+    stmt->bindInt32(idx++, offset);
+    auto rt = stmt->query();
+    if (!rt) {
+        return 0;
+    }
+    while (rt->next()) {
+        OauthClientsInfo::ptr v(new OauthClientsInfo);
+        v->m_id = rt->getInt64(0);
+        v->m_clientId = rt->getString(1);
+        v->m_clientSecretHash = rt->getString(2);
+        v->m_clientName = rt->getString(3);
+        v->m_redirectUris = rt->getString(4);
+        v->m_grantTypes = rt->getString(5);
+        v->m_allowedScopes = rt->getString(6);
+        v->m_clientUri = rt->getString(7);
+        v->m_logoUri = rt->getString(8);
+        v->m_enabled = rt->getInt32(9);
+        v->m_createTime = rt->getTime(10);
+        v->m_updateTime = rt->getTime(11);
+        results.push_back(v);
+    }
+    return 0;
 }
 
 int OauthClientsInfoDao::CreateTableSQLite3(chen::IDB::ptr conn) {
@@ -335,6 +690,53 @@ int OauthClientsInfoDao::CreateTableMySQL(chen::IDB::ptr conn) {
             "`update_time` timestamp NOT NULL DEFAULT current_timestamp COMMENT '更新时间',"
             "PRIMARY KEY(`id`),"
             "UNIQUE KEY `oauth_clients_client_id` (`client_id`)) COMMENT='OAuth 客户端注册表'");
+}
+
+int OauthClientsInfoDao::Migrate(chen::IDB::ptr conn) {
+    if (!conn) {
+        ERROR(logger) << "Migrate conn is null";
+        return -1;
+    }
+
+    conn->execute("CREATE TABLE IF NOT EXISTS schema_version ("
+        "table_name VARCHAR(128) PRIMARY KEY, "
+        "version INT NOT NULL DEFAULT 0)");
+
+    auto verStmt = conn->prepare("SELECT version FROM schema_version WHERE table_name = ?");
+    if (!verStmt) {
+        ERROR(logger) << "Migrate prepare version query failed errno=" << conn->getErrno();
+        return conn->getErrno();
+    }
+    verStmt->bindString(1, "oauth_clients");
+    auto verRt = verStmt->query();
+    int dbVer = 0;
+    if (verRt && verRt->next()) {
+        dbVer = (int)verRt->getInt64(0);
+    }
+
+    if (dbVer < 1) {
+        if (CreateTableSQLite3(conn)) {
+            ERROR(logger) << "Migrate v1 CreateTable failed";
+            return conn->getErrno();
+        }
+    }
+
+    if (dbVer == 0) {
+        auto insStmt = conn->prepare("INSERT INTO schema_version (table_name, version) VALUES (?, ?)");
+        if (insStmt) {
+            insStmt->bindString(1, "oauth_clients");
+            insStmt->bindInt32(2, 1);
+            insStmt->execute();
+        }
+    } else {
+        auto updStmt = conn->prepare("UPDATE schema_version SET version = ? WHERE table_name = ?");
+        if (updStmt) {
+            updStmt->bindInt32(1, 1);
+            updStmt->bindString(2, "oauth_clients");
+            updStmt->execute();
+        }
+    }
+    return 0;
 }
 
 int OauthClientsInfoDao::MigrateTableSQLite3(chen::IDB::ptr conn) {
