@@ -1,7 +1,9 @@
 #include "AuthModule.hpp"
 
+#include <memory>
 #include <ranges>
 
+#include <chen/module/module.h>
 #include <chen/log/log.h>
 #include <chen/application.h>
 #include <chen/http/http_server.h>
@@ -25,7 +27,7 @@ static chen::ConfigVar<std::map<std::string, std::map<std::string, std::string>>
     chen::Config::Lookup("mysql.dbs", std::map<std::string, std::map<std::string, std::string>>(), "mysql dbs");
 
 AuthModule::AuthModule() 
-    : chen::Module("AuthModule", "1.0.0", "") {
+    : Module("AuthModule", "1.0.0", "") {
 }
 
 void AuthModule::onBeforeArgsParse(int argc, char** argv) {
@@ -94,7 +96,7 @@ uint64_t AuthModule::getTickIntervalMs() {
 bool AuthModule::initMySQL() {
     const auto& mysql_dbs = g_mysql_dbs->getValue();
     for (const auto& params : mysql_dbs | std::views::values) {
-        chen::MySQL::ptr mysql(new chen::MySQL(params));
+        auto mysql = std::make_shared<chen::MySQL>(params);
         if (!mysql->connect()) {
             ERROR(logger) << "connect mysql failed";
             return false;
@@ -124,12 +126,12 @@ bool AuthModule::initMySQL() {
     return true;
 }
 
-void AuthModule::registerServlets(std::vector<chen::TcpServer::ptr>& servers) {
+void AuthModule::registerServlets(const std::vector<chen::TcpServer::ptr>& servers) {
     INFO(logger) << "registerServlets";
 
     for (auto& i : servers) {
-        auto hs = std::dynamic_pointer_cast<chen::http::HttpServer>(i);
-        auto dp = hs->getServletDispatch();
+        const auto hs = std::dynamic_pointer_cast<chen::http::HttpServer>(i);
+        const auto dp = hs->getServletDispatch();
 
 #define XX(clazz) chen::http::Servlet::ptr(new clazz)
 
