@@ -15,6 +15,9 @@ namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
 
+static chen::ConfigVar<AuthConf>::ptr g_auth_conf =
+    chen::Config::Lookup("auth", AuthConf(), "auth configuration");
+
 TokenServlet::TokenServlet() : AuthServlet("TokenServlet") {}
 
 /// 从请求中提取 client_id 和 client_secret
@@ -131,10 +134,10 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
 
     // ===== 生成 ID Token =====
     Json::Value idTokenPayload;
-    idTokenPayload["iss"] = OidcConfig::s_issuer;
+    idTokenPayload["iss"] = g_auth_conf->getValue().issuer;
     idTokenPayload["sub"] = std::to_string(userId);
     idTokenPayload["aud"] = clientId;
-    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_idTokenTtl);
+    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.id_token_ttl);
     idTokenPayload["iat"] = static_cast<Json::Int64>(nowSec);
     idTokenPayload["auth_time"] = static_cast<Json::Int64>(nowSec);
     if (!nonce.empty()) {
@@ -154,8 +157,10 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
         }
     }
 
+    const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
+
     std::string idToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(idTokenPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(idTokenPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (idToken.empty()) {
         ERROR(logger) << "create id_token failed";
         errorResponse(result, response, "server_error");
@@ -164,16 +169,16 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
 
     // ===== 生成 Access Token =====
     Json::Value atPayload;
-    atPayload["iss"] = OidcConfig::s_issuer;
+    atPayload["iss"] = g_auth_conf->getValue().issuer;
     atPayload["sub"] = std::to_string(userId);
     atPayload["aud"] = clientId;
     atPayload["client_id"] = clientId;
-    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_accessTokenTtl);
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.access_token_ttl);
     atPayload["iat"] = static_cast<Json::Int64>(nowSec);
     atPayload["scope"] = scope;
 
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed";
         errorResponse(result, response, "server_error");
@@ -188,7 +193,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     rtData["user_id"] = userId;
     rtData["username"] = username;
     rtData["scope"] = scope;
-    if (!RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData), OidcConfig::s_refreshTokenTtl)) {
+    if (!RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData), g_auth_conf->getValue().token.refresh_token_ttl)) {
         ERROR(logger) << "save refresh_token failed";
     }
 
@@ -196,7 +201,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     result->setResult(200, "ok");
     result->set("access_token", accessToken);
     result->set("token_type", std::string("Bearer"));
-    result->set("expires_in", OidcConfig::s_accessTokenTtl);
+    result->set("expires_in", g_auth_conf->getValue().token.access_token_ttl);
     result->set("id_token", idToken);
     result->set("refresh_token", refreshToken);
 
@@ -248,16 +253,18 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
 
     // ===== 生成新的 Access Token =====
     Json::Value atPayload;
-    atPayload["iss"] = OidcConfig::s_issuer;
+    atPayload["iss"] = g_auth_conf->getValue().issuer;
     atPayload["sub"] = std::to_string(userId);
     atPayload["aud"] = clientId;
     atPayload["client_id"] = clientId;
-    atPayload["exp"] = static_cast<Json::Int64>(nowSec + OidcConfig::s_accessTokenTtl);
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.access_token_ttl);
     atPayload["iat"] = static_cast<Json::Int64>(nowSec);
     atPayload["scope"] = scope;
 
+    const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
+
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), OidcConfig::s_kid, OidcConfig::s_privateKeyPem);
+        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed on refresh";
         errorResponse(result, response, "server_error");
@@ -272,7 +279,7 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     newRtData["user_id"] = userId;
     newRtData["username"] = username;
     newRtData["scope"] = scope;
-    if (!RefreshTokenStore::save(newRT, chen::JsonUtil::ToString(newRtData), OidcConfig::s_refreshTokenTtl)) {
+    if (!RefreshTokenStore::save(newRT, chen::JsonUtil::ToString(newRtData), g_auth_conf->getValue().token.refresh_token_ttl)) {
         ERROR(logger) << "save new refresh_token failed";
     }
 
@@ -280,7 +287,7 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     result->setResult(200, "ok");
     result->set("access_token", accessToken);
     result->set("token_type", std::string("Bearer"));
-    result->set("expires_in", OidcConfig::s_accessTokenTtl);
+    result->set("expires_in", g_auth_conf->getValue().token.access_token_ttl);
     result->set("refresh_token", newRT);
 
     response->setBody(result->toJsonString());

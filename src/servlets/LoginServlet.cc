@@ -11,6 +11,9 @@ namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
 
+static chen::ConfigVar<AuthConf>::ptr g_auth_conf =
+    chen::Config::Lookup("auth", AuthConf(), "auth configuration");
+
 LoginServlet::LoginServlet() : AuthServlet("LoginServlet") {}
 
 int32_t LoginServlet::handle(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response
@@ -56,9 +59,9 @@ int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::htt
         return 0;
     }
 
+    int session_ttl = g_auth_conf->getValue().session_ttl;
     // 创建会话
-    std::string sid =
-        SessionStore::createSession(user["id"].asInt64(), user["username"].asString(), OidcConfig::s_sessionTtl);
+    std::string sid = SessionStore::createSession(user["id"].asInt64(), user["username"].asString(), session_ttl);
     if (sid.empty()) {
         ERROR(logger) << "create session failed";
         result->setResult(500, "server_error");
@@ -68,8 +71,7 @@ int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::htt
     }
 
     // 设置 SESSIONID cookie
-    std::string cookie =
-        "SESSIONID=" + sid + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + std::to_string(OidcConfig::s_sessionTtl);
+    std::string cookie = "SESSIONID=" + sid + "; HttpOnly; SameSite=Lax; Path=/; Max-Age=" + std::to_string(session_ttl);
     response->setHeader("Set-Cookie", cookie);
 
     INFO(logger) << "login success user=" << username;

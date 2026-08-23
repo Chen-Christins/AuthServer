@@ -51,9 +51,6 @@ bool AuthModule::onUnload() {
 bool AuthModule::onServerReady() {
     INFO(logger) << "onServerReady";
 
-    // 初始化 OIDC 配置（加载密钥和配置项）
-    OidcConfig::init();
-
     if (!initMySQL()) {
         ERROR(logger) << "initDB failed";
         return false;
