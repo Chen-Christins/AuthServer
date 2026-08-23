@@ -89,6 +89,7 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
         }
         response->setRedirect(errUrl);
         response->setStatus(chen::http::HttpStatus::FOUND);
+        response->setHeader("Content-Length", "0");
         return 0;
     }
 
@@ -137,6 +138,7 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
 
     response->setRedirect(location);
     response->setStatus(chen::http::HttpStatus::FOUND);
+    response->setHeader("Content-Length", "0");
     return 0;
 }
 
