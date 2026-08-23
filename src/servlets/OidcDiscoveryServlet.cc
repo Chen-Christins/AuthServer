@@ -9,11 +9,14 @@ namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
 
+static chen::ConfigVar<AuthConf>::ptr g_auth_conf =
+    chen::Config::Lookup("auth", AuthConf(), "auth configuration");
+
 OidcDiscoveryServlet::OidcDiscoveryServlet() : AuthServlet("OidcDiscoveryServlet") {}
 
 int32_t OidcDiscoveryServlet::handle(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response
         , chen::http::HttpSession::ptr session, Result::ptr result) {
-    std::string iss = OidcConfig::s_issuer;
+    std::string iss = g_auth_conf->getValue().issuer;
 
     result->setResult(200, "ok");
     result->set("issuer", iss);

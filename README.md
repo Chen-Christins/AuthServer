@@ -30,7 +30,6 @@ chen HTTP Server (:8090)
 ├── src/
 │   ├── AuthModule.cc         ← 模块入口 + 路由注册
 │   ├── JwtUtil.cc            ← JWT 创建/验签 + JWK 导出
-│   ├── OidcConfig.cc         ← 配置加载
 │   ├── Store.cc              ← 数据层（User/Client/Code/Session/Token）
 │   ├── util.h                ← DB/Redis 连接辅助
 │   └── servlets/

@@ -12,6 +12,9 @@ namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
 
+static chen::ConfigVar<AuthConf>::ptr g_auth_conf =
+    chen::Config::Lookup("auth", AuthConf(), "auth configuration");
+
 AuthorizationServlet::AuthorizationServlet() : AuthServlet("AuthorizationServlet") {}
 
 int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response
@@ -117,7 +120,7 @@ int32_t AuthorizationServlet::handle(chen::http::HttpRequest::ptr request, chen:
     codeData["nonce"] = request->getParam("nonce");
     std::string codeJson = chen::JsonUtil::ToString(codeData);
 
-    if (!AuthCodeStore::save(code, codeJson, OidcConfig::s_authCodeTtl)) {
+    if (!AuthCodeStore::save(code, codeJson, g_auth_conf->getValue().token.auth_code_ttl)) {
         ERROR(logger) << "failed to save auth code to redis";
         result->setResult(500, "server_error");
         response->setBody(result->toJsonString());

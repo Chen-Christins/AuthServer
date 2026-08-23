@@ -2,8 +2,6 @@
 
 #include <chen/util/util.h>
 
-#include <ctime>
-
 namespace auth {
 
 Result::Result(int32_t c, const std::string& m)
