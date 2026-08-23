@@ -5,7 +5,6 @@
 
 #include <chen/log/log.h>
 #include <chen/util/json_util.h>
-#include <chen/util/string_util.h>
 
 namespace auth {
 

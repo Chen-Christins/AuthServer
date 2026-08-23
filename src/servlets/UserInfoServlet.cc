@@ -16,7 +16,6 @@ static chen::Logger::ptr logger = LOG_NAME("auth");
 static chen::ConfigVar<AuthConf>::ptr g_auth_conf =
     chen::Config::Lookup("auth", AuthConf(), "auth configuration");
 
-
 UserInfoServlet::UserInfoServlet() : AuthServlet("UserInfoServlet") {}
 
 int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response
@@ -38,7 +37,7 @@ int32_t UserInfoServlet::handle(chen::http::HttpRequest::ptr request, chen::http
     const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
     // ========== 2. 验证 JWT 签名 ==========
     Json::Value payload;
-    if (!JwtUtil::verifyJWT(token, private_key_pem, payload)) {
+    if (!JwtUtil::VerifyJWT(token, private_key_pem, payload)) {
         WARN(logger) << "userinfo: invalid token signature";
         result->setResult(401, "invalid_token");
         response->setBody(result->toJsonString());

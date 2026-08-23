@@ -65,31 +65,12 @@ fox_thread:
 # Redis configuration for the blog, defining the host, type, pool size, and timeout settings for the Redis connection used by the blog.
 redis:
   config:
-    blog:
+    auth:
       host: 127.0.0.1:6379
       type: fox_redis
       pool: 1
       timeout: 100
-    auth:
-      host: 127.0.0.1:6379
-      type: fox_redis
-      pool: 2
-      timeout: 100
   desc: "type: redis,redis_cluster,fox_redis,fox_redis_cluster"
-
-# OIDC 认证服务配置
-auth:
-  issuer: "http://localhost:8090"
-  key:
-    kid: rsa1
-    private_key_path: /home/chen/workspace/AuthServer/bin/keys/private.pem
-    public_key_path: /home/chen/workspace/AuthServer/bin/keys/public.pem
-  token:
-    access_token_ttl: 3600       # 1h — JWT 本身无状态，不存在 Redis
-    id_token_ttl: 3600           # 1h — ID Token 也是 JWT
-    refresh_token_ttl: 2592000   # 30d — Redis 自动过期
-    auth_code_ttl: 300           # 5min — Redis 自动过期
-  session_ttl: 86400             # 24h — Redis 自动过期
 
 # MySQL 配置
 mysql:

@@ -31,7 +31,7 @@ int32_t JwksServlet::handle(chen::http::HttpRequest::ptr request, chen::http::Ht
 
     // JWKS JSON 解析后放入 data 层
     Json::Value jwks;
-    chen::JsonUtil::FromString(jwks, JwtUtil::extractJWKS(public_key_pem, kid));
+    chen::JsonUtil::FromString(jwks, JwtUtil::ExtractJWKS(public_key_pem, kid));
     result->setResult(200, "ok");
     result->set("keys", jwks["keys"]);
 

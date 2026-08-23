@@ -160,7 +160,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
 
     std::string idToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(idTokenPayload), g_auth_conf->getValue().key.kid, private_key_pem);
+        JwtUtil::CreateJWT(chen::JsonUtil::ToString(idTokenPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (idToken.empty()) {
         ERROR(logger) << "create id_token failed";
         errorResponse(result, response, "server_error");
@@ -178,7 +178,7 @@ int32_t TokenServlet::handleAuthCodeGrant(chen::http::HttpRequest::ptr request, 
     atPayload["scope"] = scope;
 
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
+        JwtUtil::CreateJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed";
         errorResponse(result, response, "server_error");
@@ -264,7 +264,7 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
 
     std::string accessToken =
-        JwtUtil::createJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
+        JwtUtil::CreateJWT(chen::JsonUtil::ToString(atPayload), g_auth_conf->getValue().key.kid, private_key_pem);
     if (accessToken.empty()) {
         ERROR(logger) << "create access_token failed on refresh";
         errorResponse(result, response, "server_error");

@@ -21,7 +21,7 @@ public:
      * @param privateKeyPem  PEM 格式 RSA 私钥
      * @return 完整 JWT，失败返回空串
      */
-    static std::string createJWT(const std::string& payloadJson, const std::string& kid,
+    static std::string CreateJWT(const std::string& payloadJson, const std::string& kid,
                                  const std::string& privateKeyPem);
 
     /**
@@ -31,7 +31,7 @@ public:
      * @param[out] payload  解析后的 payload
      * @return bool 是否通过
      */
-    static bool verifyJWT(const std::string& jwt, const std::string& publicKeyPem, Json::Value& payload);
+    static bool VerifyJWT(const std::string& jwt, const std::string& publicKeyPem, Json::Value& payload);
 
     /**
      * @brief 从 RSA 公钥 PEM 导出 JWK
@@ -39,7 +39,7 @@ public:
      * @param kid           密钥 ID
      * @return JWK JSON，失败返回 Json::nullValue
      */
-    static Json::Value extractJWK(const std::string& publicKeyPem, const std::string& kid);
+    static Json::Value ExtractJWK(const std::string& publicKeyPem, const std::string& kid);
 
     /**
      * @brief 从 RSA 公钥 PEM 导出 JWKS（JWK Set）
@@ -47,7 +47,7 @@ public:
      * @param kid           密钥 ID
      * @return JWKS JSON 字符串，失败返回 "{}"
      */
-    static std::string extractJWKS(const std::string& publicKeyPem, const std::string& kid);
+    static std::string ExtractJWKS(const std::string& publicKeyPem, const std::string& kid);
 };
 
 } // namespace auth

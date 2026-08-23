@@ -17,7 +17,7 @@ namespace auth {
 
 static chen::Logger::ptr logger = LOG_NAME("auth");
 
-std::string JwtUtil::createJWT(const std::string& payloadJson, const std::string& kid
+std::string JwtUtil::CreateJWT(const std::string& payloadJson, const std::string& kid
         , const std::string& privateKeyPem) {
     Json::Value header;
     header["alg"] = "RS256";
@@ -45,7 +45,7 @@ std::string JwtUtil::createJWT(const std::string& payloadJson, const std::string
     return h + "." + p + "." + chen::StringUtil::Base64UrlEncode(sig);
 }
 
-bool JwtUtil::verifyJWT(const std::string& jwt, const std::string& publicKeyPem, Json::Value& payload) {
+bool JwtUtil::VerifyJWT(const std::string& jwt, const std::string& publicKeyPem, Json::Value& payload) {
     auto parts = chen::StringUtil::Split(jwt, '.');
     if (parts.size() != 3) {
         ERROR(logger) << "verifyJWT: invalid JWT format, parts=" << parts.size();
@@ -73,7 +73,7 @@ bool JwtUtil::verifyJWT(const std::string& jwt, const std::string& publicKeyPem,
     return true;
 }
 
-Json::Value JwtUtil::extractJWK(const std::string& publicKeyPem, const std::string& kid) {
+Json::Value JwtUtil::ExtractJWK(const std::string& publicKeyPem, const std::string& kid) {
     BIO* bio = BIO_new_mem_buf(publicKeyPem.data(), static_cast<int>(publicKeyPem.size()));
     if (!bio) {
         ERROR(logger) << "extractJWK: BIO_new_mem_buf failed";
@@ -120,8 +120,8 @@ Json::Value JwtUtil::extractJWK(const std::string& publicKeyPem, const std::stri
     return jwk;
 }
 
-std::string JwtUtil::extractJWKS(const std::string& publicKeyPem, const std::string& kid) {
-    Json::Value jwk = extractJWK(publicKeyPem, kid);
+std::string JwtUtil::ExtractJWKS(const std::string& publicKeyPem, const std::string& kid) {
+    Json::Value jwk = ExtractJWK(publicKeyPem, kid);
     if (jwk.isNull()) {
         return "{}";
     }
