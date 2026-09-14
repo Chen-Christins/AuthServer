@@ -12,12 +12,16 @@
 #include "OidcConfig.hpp"
 #include "auth/data/oauth_users_info.h"
 #include "auth/data/oauth_clients_info.h"
+#include "auth/data/oauth_recovery_codes_info.h"
 #include "servlets/OidcDiscoveryServlet.hpp"
 #include "servlets/JwksServlet.hpp"
 #include "servlets/AuthorizationServlet.hpp"
 #include "servlets/LoginServlet.hpp"
 #include "servlets/TokenServlet.hpp"
 #include "servlets/UserInfoServlet.hpp"
+#include "servlets/TotpSetupServlet.hpp"
+#include "servlets/TotpConfirmServlet.hpp"
+#include "servlets/TotpDisableServlet.hpp"
 
 namespace auth {
 
@@ -106,6 +110,7 @@ bool AuthModule::initMySQL() {
     }
     XX(OauthClientsInfoDao, "oauth_clients_info")
     XX(OauthUsersInfoDao, "oauth_users_info")
+    XX(OauthRecoveryCodesInfoDao, "oauth_recovery_codes")
 #undef XX
 
     // 数据库迁移：为已有表补充新增列
@@ -114,6 +119,7 @@ bool AuthModule::initMySQL() {
 #define XX(clazz) auth::data::clazz::MigrateTableMySQL(mysql);
         XX(OauthClientsInfoDao)
         XX(OauthUsersInfoDao)
+        XX(OauthRecoveryCodesInfoDao)
 #undef XX
         INFO(logger) << "migrate database end";
     }
@@ -128,7 +134,10 @@ void AuthModule::registerServlets(const std::vector<chen::TcpServer::ptr>& serve
 
     for (auto& i : servers) {
         const auto hs = std::dynamic_pointer_cast<chen::http::HttpServer>(i);
+        ASSERT_RET(hs);
+
         const auto dp = hs->getServletDispatch();
+        ASSERT_RET(dp);
 
 #define XX(clazz) chen::http::Servlet::ptr(new clazz)
 
@@ -139,6 +148,11 @@ void AuthModule::registerServlets(const std::vector<chen::TcpServer::ptr>& serve
         dp->addServlet("/login", XX(LoginServlet));
         dp->addServlet("/token", XX(TokenServlet));
         dp->addServlet("/userinfo", XX(UserInfoServlet));
+
+        // 2FA TOTP 端点
+        dp->addServlet("/totp/setup", XX(TotpSetupServlet));
+        dp->addServlet("/totp/confirm", XX(TotpConfirmServlet));
+        dp->addServlet("/totp/disable", XX(TotpDisableServlet));
 
         INFO(logger) << "OIDC endpoints registered";
 

@@ -2,6 +2,7 @@
 
 #include "../OidcConfig.hpp"
 #include "../Store.hpp"
+#include "../Util.hpp"
 
 #include <chen/log/log.h>
 #include <chen/util/json_util.h>
@@ -58,9 +59,33 @@ int32_t LoginServlet::handlePost(chen::http::HttpRequest::ptr request, chen::htt
         return 0;
     }
 
+    int64_t userId = user["id"].asInt64();
+
+    // 2FA: 密码通过后检查是否启用 TOTP
+    if (UserStore::isTotpEnabled(userId)) {
+        // 生成临时凭证存入 Redis（5分钟有效）
+        std::string tempToken = chen::StringUtil::ToLower(chen::StringUtil::HexEncode(chen::RandomUtil::RandBytes(32)));
+        auto rds = GetRedis();
+        if (!rds) {
+            result->setResult(500, "server_error");
+            response->setBody(result->toJsonString());
+            response->setStatus(chen::http::HttpStatus::INTERNAL_SERVER_ERROR);
+            return 0;
+        }
+        rds->cmd("SETEX 2fa_pending:%s 300 %lld", tempToken.c_str(), (long long)userId);
+
+        result->setResult(200, "ok");
+        result->set("require_2fa", true);
+        result->set("temp_token", tempToken);
+        response->setBody(result->toJsonString());
+        response->setStatus(chen::http::HttpStatus::OK);
+        INFO(logger) << "login user=" << username << " require 2fa";
+        return 0;
+    }
+
     int session_ttl = g_auth_conf->getValue().session_ttl;
     // 创建会话
-    std::string sid = SessionStore::createSession(user["id"].asInt64(), user["username"].asString(), session_ttl);
+    std::string sid = SessionStore::createSession(userId, user["username"].asString(), session_ttl);
     if (sid.empty()) {
         ERROR(logger) << "create session failed";
         result->setResult(500, "server_error");

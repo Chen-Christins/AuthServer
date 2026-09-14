@@ -1,0 +1,13 @@
+<table name="oauth_recovery_codes" namespace="auth.data" desc="2FA恢复码">
+    <columns>
+        <column name="id" type="int64" auto_increment="true" desc="主键"/>
+        <column name="user_id" type="int64" desc="用户ID"/>
+        <column name="code_hash" type="string" length="128" desc="恢复码SHA-256哈希"/>
+        <column name="used" type="int32" default="0" desc="是否已使用: 0否 1是"/>
+        <column name="create_time" type="datetime" default="current_timestamp" desc="创建时间"/>
+    </columns>
+    <indexs>
+        <index name="pk" cols="id" type="pk"/>
+        <index name="idx_user_id" cols="user_id" type="index"/>
+    </indexs>
+</table>

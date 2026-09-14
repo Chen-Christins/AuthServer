@@ -10,6 +10,8 @@
         <column name="enabled" type="int32" default="1" desc="是否启用"/>
         <column name="create_time" type="datetime" default="current_timestamp" desc="创建时间"/>
         <column name="update_time" type="datetime" default="current_timestamp" desc="更新时间"/>
+        <column name="totp_secret" type="string" size="64" default="" desc="TOTP 密钥 (Base32)"/>
+        <column name="totp_enabled" type="int32" default="0" desc="是否启用 2FA"/>
     </columns>
     <indexs>
         <index name="pk" cols="id" type="pk"/>
