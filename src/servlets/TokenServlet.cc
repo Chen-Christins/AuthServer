@@ -3,6 +3,9 @@
 #include "../JwtUtil.hpp"
 #include "../OidcConfig.hpp"
 #include "../Store.hpp"
+#include "../TotpUtil.hpp"
+#include "../Util.hpp"
+#include "auth/data/oauth_users_info.h"
 
 #include <chen/log/log.h>
 #include <chen/util/encryptor_util.h>
@@ -78,6 +81,12 @@ int32_t TokenServlet::handle(chen::http::HttpRequest::ptr request, chen::http::H
     }
     if (grantType == "refresh_token") {
         return handleRefreshTokenGrant(request, response, result);
+    }
+    if (grantType == "totp") {
+        return handleTotpGrant(request, response, result);
+    }
+    if (grantType == "totp_recovery") {
+        return handleTotpRecoveryGrant(request, response, result);
     }
 
     result->setResult(400, "unsupported_grant_type");
@@ -296,6 +305,263 @@ int32_t TokenServlet::handleRefreshTokenGrant(chen::http::HttpRequest::ptr reque
     response->setStatus(chen::http::HttpStatus::OK);
 
     INFO(logger) << "token refreshed for client=" << clientId;
+    return 0;
+}
+
+// ============================================================================
+// grant_type=totp — 两步登录第二步：temp_token + TOTP 码 → 签发 Token
+// ============================================================================
+int32_t TokenServlet::handleTotpGrant(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response, Result::ptr result) {
+    std::string tempToken = request->getParam("temp_token");
+    std::string totpCode = request->getParam("totp_code");
+
+    if (tempToken.empty() || totpCode.empty()) {
+        errorResponse(result, response, "invalid_request", "temp_token and totp_code required");
+        return 0;
+    }
+
+    // 提取并校验客户端凭证
+    std::string clientId, clientSecret;
+    if (!extractClientCredentials(request, clientId, clientSecret)) {
+        errorResponse(result, response, "invalid_client", "client authentication failed");
+        return 0;
+    }
+    if (!verifyClientSecret(clientId, clientSecret)) {
+        errorResponse(result, response, "invalid_client", "client secret mismatch");
+        return 0;
+    }
+
+    // 从 Redis 取出 temp_token 对应的 userId
+    auto rds = GetRedis();
+    if (!rds) {
+        errorResponse(result, response, "server_error");
+        return 0;
+    }
+
+    std::string redisKey = "2fa_pending:" + tempToken;
+    auto reply = rds->cmd("GET %s", redisKey.c_str());
+    if (!reply || reply->type != REDIS_REPLY_STRING) {
+        errorResponse(result, response, "invalid_grant", "temp_token invalid or expired");
+        return 0;
+    }
+    int64_t userId = 0;
+    try {
+        userId = std::stoll(std::string(reply->str, reply->len));
+    } catch (...) {
+        errorResponse(result, response, "invalid_grant", "temp_token invalid");
+        return 0;
+    }
+
+    // 删除 temp_token（一次性）
+    rds->cmd("DEL %s", redisKey.c_str());
+
+    // 验证 TOTP 码
+    std::string totpSecret = UserStore::getTotpSecret(userId);
+    if (totpSecret.empty() || !TotpUtil::VerifyCode(totpSecret, totpCode, 1)) {
+        WARN(logger) << "totp verify failed for user=" << userId;
+        errorResponse(result, response, "invalid_grant", "invalid TOTP code");
+        return 0;
+    }
+
+    // TOTP 验证通过，签发 Token
+    Json::Value user = UserStore::findByUsername(
+        [&]() -> std::string {
+            auto db = GetDB();
+            auto info = auth::data::OauthUsersInfoDao::Query(userId, db);
+            return info ? info->getUsername() : "";
+        }());
+    if (user.isNull()) {
+        errorResponse(result, response, "server_error", "user not found");
+        return 0;
+    }
+
+    std::string username = user["username"].asString();
+    std::string scope = "openid profile email";
+    uint64_t nowSec = chen::GetCurrentMs() / 1000;
+
+    const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
+
+    // ID Token
+    Json::Value idTokenPayload;
+    idTokenPayload["iss"] = g_auth_conf->getValue().issuer;
+    idTokenPayload["sub"] = std::to_string(userId);
+    idTokenPayload["aud"] = clientId;
+    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.id_token_ttl);
+    idTokenPayload["iat"] = static_cast<Json::Int64>(nowSec);
+    idTokenPayload["auth_time"] = static_cast<Json::Int64>(nowSec);
+
+    std::string idToken = JwtUtil::CreateJWT(chen::JsonUtil::ToString(idTokenPayload),
+        g_auth_conf->getValue().key.kid, private_key_pem);
+    if (idToken.empty()) {
+        errorResponse(result, response, "server_error", "failed to create id_token");
+        return 0;
+    }
+
+    // Access Token
+    Json::Value atPayload;
+    atPayload["iss"] = g_auth_conf->getValue().issuer;
+    atPayload["sub"] = std::to_string(userId);
+    atPayload["aud"] = clientId;
+    atPayload["client_id"] = clientId;
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.access_token_ttl);
+    atPayload["iat"] = static_cast<Json::Int64>(nowSec);
+    atPayload["scope"] = scope;
+
+    std::string accessToken = JwtUtil::CreateJWT(chen::JsonUtil::ToString(atPayload),
+        g_auth_conf->getValue().key.kid, private_key_pem);
+    if (accessToken.empty()) {
+        errorResponse(result, response, "server_error", "failed to create access_token");
+        return 0;
+    }
+
+    // Refresh Token
+    std::string refreshToken = chen::StringUtil::ToLower(chen::StringUtil::HexEncode(chen::RandomUtil::RandBytes(32)));
+    Json::Value rtData;
+    rtData["client_id"] = clientId;
+    rtData["user_id"] = userId;
+    rtData["username"] = username;
+    rtData["scope"] = scope;
+    RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData),
+        g_auth_conf->getValue().token.refresh_token_ttl);
+
+    // 返回
+    result->setResult(200, "ok");
+    result->set("access_token", accessToken);
+    result->set("token_type", std::string("Bearer"));
+    result->set("expires_in", g_auth_conf->getValue().token.access_token_ttl);
+    result->set("id_token", idToken);
+    result->set("refresh_token", refreshToken);
+
+    response->setBody(result->toJsonString());
+    response->setHeader("Cache-Control", "no-store");
+    response->setHeader("Pragma", "no-cache");
+    response->setStatus(chen::http::HttpStatus::OK);
+
+    INFO(logger) << "totp token issued for client=" << clientId << " user=" << username;
+    return 0;
+}
+
+// ============================================================================
+// grant_type=totp_recovery — 恢复码登录
+// ============================================================================
+int32_t TokenServlet::handleTotpRecoveryGrant(chen::http::HttpRequest::ptr request, chen::http::HttpResponse::ptr response, Result::ptr result) {
+    std::string tempToken = request->getParam("temp_token");
+    std::string recoveryCode = request->getParam("recovery_code");
+
+    if (tempToken.empty() || recoveryCode.empty()) {
+        errorResponse(result, response, "invalid_request", "temp_token and recovery_code required");
+        return 0;
+    }
+
+    // 提取并校验客户端凭证
+    std::string clientId, clientSecret;
+    if (!extractClientCredentials(request, clientId, clientSecret)) {
+        errorResponse(result, response, "invalid_client", "client authentication failed");
+        return 0;
+    }
+    if (!verifyClientSecret(clientId, clientSecret)) {
+        errorResponse(result, response, "invalid_client", "client secret mismatch");
+        return 0;
+    }
+
+    // 从 Redis 取出 temp_token
+    auto rds = GetRedis();
+    if (!rds) {
+        errorResponse(result, response, "server_error");
+        return 0;
+    }
+
+    std::string redisKey = "2fa_pending:" + tempToken;
+    auto reply = rds->cmd("GET %s", redisKey.c_str());
+    if (!reply || reply->type != REDIS_REPLY_STRING) {
+        errorResponse(result, response, "invalid_grant", "temp_token invalid or expired");
+        return 0;
+    }
+    int64_t userId = 0;
+    try {
+        userId = std::stoll(std::string(reply->str, reply->len));
+    } catch (...) {
+        errorResponse(result, response, "invalid_grant", "temp_token invalid");
+        return 0;
+    }
+
+    // 删除 temp_token（一次性）
+    rds->cmd("DEL %s", redisKey.c_str());
+
+    // 验证恢复码
+    if (!RecoveryCodeStore::consume(userId, recoveryCode)) {
+        WARN(logger) << "recovery code verify failed for user=" << userId;
+        errorResponse(result, response, "invalid_grant", "invalid or used recovery code");
+        return 0;
+    }
+
+    // 恢复码验证通过，签发 Token（同 handleTotpGrant 的签发逻辑）
+    auto db = GetDB();
+    auto userInfo = auth::data::OauthUsersInfoDao::Query(userId, db);
+    if (!userInfo) {
+        errorResponse(result, response, "server_error", "user not found");
+        return 0;
+    }
+
+    std::string username = userInfo->getUsername();
+    std::string scope = "openid profile email";
+    uint64_t nowSec = chen::GetCurrentMs() / 1000;
+
+    const std::string private_key_pem = chen::FSUtil::ReadFileToString(g_auth_conf->getValue().key.private_key_path);
+
+    Json::Value idTokenPayload;
+    idTokenPayload["iss"] = g_auth_conf->getValue().issuer;
+    idTokenPayload["sub"] = std::to_string(userId);
+    idTokenPayload["aud"] = clientId;
+    idTokenPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.id_token_ttl);
+    idTokenPayload["iat"] = static_cast<Json::Int64>(nowSec);
+    idTokenPayload["auth_time"] = static_cast<Json::Int64>(nowSec);
+
+    std::string idToken = JwtUtil::CreateJWT(chen::JsonUtil::ToString(idTokenPayload),
+        g_auth_conf->getValue().key.kid, private_key_pem);
+    if (idToken.empty()) {
+        errorResponse(result, response, "server_error", "failed to create id_token");
+        return 0;
+    }
+
+    Json::Value atPayload;
+    atPayload["iss"] = g_auth_conf->getValue().issuer;
+    atPayload["sub"] = std::to_string(userId);
+    atPayload["aud"] = clientId;
+    atPayload["client_id"] = clientId;
+    atPayload["exp"] = static_cast<Json::Int64>(nowSec + g_auth_conf->getValue().token.access_token_ttl);
+    atPayload["iat"] = static_cast<Json::Int64>(nowSec);
+    atPayload["scope"] = scope;
+
+    std::string accessToken = JwtUtil::CreateJWT(chen::JsonUtil::ToString(atPayload),
+        g_auth_conf->getValue().key.kid, private_key_pem);
+    if (accessToken.empty()) {
+        errorResponse(result, response, "server_error", "failed to create access_token");
+        return 0;
+    }
+
+    std::string refreshToken = chen::StringUtil::ToLower(chen::StringUtil::HexEncode(chen::RandomUtil::RandBytes(32)));
+    Json::Value rtData;
+    rtData["client_id"] = clientId;
+    rtData["user_id"] = userId;
+    rtData["username"] = username;
+    rtData["scope"] = scope;
+    RefreshTokenStore::save(refreshToken, chen::JsonUtil::ToString(rtData),
+        g_auth_conf->getValue().token.refresh_token_ttl);
+
+    result->setResult(200, "ok");
+    result->set("access_token", accessToken);
+    result->set("token_type", std::string("Bearer"));
+    result->set("expires_in", g_auth_conf->getValue().token.access_token_ttl);
+    result->set("id_token", idToken);
+    result->set("refresh_token", refreshToken);
+
+    response->setBody(result->toJsonString());
+    response->setHeader("Cache-Control", "no-store");
+    response->setHeader("Pragma", "no-cache");
+    response->setStatus(chen::http::HttpStatus::OK);
+
+    INFO(logger) << "recovery token issued for client=" << clientId << " user=" << username;
     return 0;
 }
 

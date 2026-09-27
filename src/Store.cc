@@ -1,5 +1,11 @@
 #include "Store.hpp"
 
+#include "TotpUtil.hpp"
+#include "Util.hpp"
+#include "auth/data/oauth_clients_info.h"
+#include "auth/data/oauth_recovery_codes_info.h"
+#include "auth/data/oauth_users_info.h"
+
 #include <chen/db/mysql.h>
 #include <chen/db/redis.h>
 #include <chen/log/log.h>
@@ -7,10 +13,7 @@
 #include <chen/util/json_util.h>
 #include <chen/util/random_util.h>
 #include <chen/util/string_util.h>
-
-#include "auth/data/oauth_clients_info.h"
-#include "auth/data/oauth_users_info.h"
-#include "util.h"
+#include <chen/util/time_util.h>
 
 namespace auth {
 
@@ -56,6 +59,51 @@ Json::Value UserStore::verifyPassword(const std::string& username, const std::st
 
     user.removeMember("password_hash");
     return user;
+}
+
+std::string UserStore::getTotpSecret(int64_t userId) {
+    auto db = auth::GetDB();
+    if (!db) {
+        return "";
+    }
+    auto info = auth::data::OauthUsersInfoDao::Query(userId, db);
+    if (!info) {
+        return "";
+    }
+    return info->getTotpSecret();
+}
+
+bool UserStore::isTotpEnabled(int64_t userId) {
+    auto db = auth::GetDB();
+    if (!db) {
+        return false;
+    }
+    auto info = auth::data::OauthUsersInfoDao::Query(userId, db);
+    if (!info) {
+        return false;
+    }
+    return info->getTotpEnabled() == 1;
+}
+
+bool UserStore::setTotp(int64_t userId, const std::string& secret, bool enabled) {
+    auto db = auth::GetDB();
+    if (!db) {
+        ERROR(logger) << "UserStore::setTotp: get mysql conn failed";
+        return false;
+    }
+    auto info = auth::data::OauthUsersInfoDao::Query(userId, db);
+    if (!info) {
+        ERROR(logger) << "UserStore::setTotp: user not found, id=" << userId;
+        return false;
+    }
+    info->setTotpSecret(secret);
+    info->setTotpEnabled(enabled ? 1 : 0);
+    info->setUpdateTime(static_cast<int64_t>(time(nullptr)));
+    if (auth::data::OauthUsersInfoDao::Update(info, db)) {
+        ERROR(logger) << "UserStore::setTotp: update failed, id=" << userId;
+        return false;
+    }
+    return true;
 }
 
 Json::Value ClientStore::findByClientId(const std::string& clientId) {
@@ -232,6 +280,74 @@ void SessionStore::destroySession(const std::string& sessionId) {
         return;
     }
     rds->cmd("DEL sess:%s", sessionId.c_str());
+}
+
+// ============================================================================
+// RecoveryCodeStore
+// ============================================================================
+
+bool RecoveryCodeStore::save(int64_t userId, const std::vector<std::string>& hashedCodes) {
+    auto db = auth::GetDB();
+    if (!db) {
+        ERROR(logger) << "RecoveryCodeStore::save: get mysql conn failed";
+        return false;
+    }
+
+    for (auto& hash : hashedCodes) {
+        auto info = std::make_shared<auth::data::OauthRecoveryCodesInfo>();
+        info->setUserId(userId);
+        info->setCodeHash(hash);
+        info->setUsed(0);
+        if (auth::data::OauthRecoveryCodesInfoDao::Insert(info, db)) {
+            ERROR(logger) << "RecoveryCodeStore::save: insert failed, userId=" << userId;
+            return false;
+        }
+    }
+    return true;
+}
+
+bool RecoveryCodeStore::consume(int64_t userId, const std::string& code) {
+    auto db = auth::GetDB();
+    if (!db) {
+        ERROR(logger) << "RecoveryCodeStore::consume: get mysql conn failed";
+        return false;
+    }
+
+    std::string codeHash = TotpUtil::HashRecoveryCode(code);
+
+    auto qb = auth::data::OauthRecoveryCodesInfoDao::newQuery();
+    qb->where("user_id", "=", userId);
+    qb->where("code_hash", "=", codeHash);
+    qb->where("used", "=", (int64_t)0);
+
+    std::vector<auth::data::OauthRecoveryCodesInfo::ptr> results;
+    if (auth::data::OauthRecoveryCodesInfoDao::QueryByBuilder(results, qb, db)) {
+        return false;
+    }
+    if (results.empty()) {
+        return false;
+    }
+
+    auto matched = results[0];
+    matched->setUsed(1);
+    auth::data::OauthRecoveryCodesInfoDao::Update(matched, db);
+    return true;
+}
+
+void RecoveryCodeStore::removeAll(int64_t userId) {
+    auto db = auth::GetDB();
+    if (!db) {
+        return;
+    }
+
+    auto qb = auth::data::OauthRecoveryCodesInfoDao::newQuery();
+    qb->where("user_id", "=", userId);
+
+    std::vector<auth::data::OauthRecoveryCodesInfo::ptr> results;
+    auth::data::OauthRecoveryCodesInfoDao::QueryByBuilder(results, qb, db);
+    for (auto& rc : results) {
+        auth::data::OauthRecoveryCodesInfoDao::DeleteById(rc->getId(), db);
+    }
 }
 
 } // namespace auth

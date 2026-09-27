@@ -9,6 +9,7 @@
 
 #include <json/json.h>
 #include <string>
+#include <vector>
 
 namespace auth {
 
@@ -31,6 +32,29 @@ public:
      * @return 用户 JSON，失败返回 null
      */
     static Json::Value verifyPassword(const std::string& username, const std::string& password);
+
+    /**
+     * @brief 获取用户的 TOTP 密钥
+     * @param userId 用户 ID
+     * @return TOTP 密钥（Base32），未启用返回空串
+     */
+    static std::string getTotpSecret(int64_t userId);
+
+    /**
+     * @brief 获取用户 2FA 启用状态
+     * @param userId 用户 ID
+     * @return true 已启用
+     */
+    static bool isTotpEnabled(int64_t userId);
+
+    /**
+     * @brief 设置 TOTP 密钥（启用/禁用时调用）
+     * @param userId 用户 ID
+     * @param secret Base32 编码的密钥，空串表示禁用
+     * @param enabled 是否启用
+     * @return bool 是否成功
+     */
+    static bool setTotp(int64_t userId, const std::string& secret, bool enabled);
 };
 
 /**
@@ -130,6 +154,34 @@ public:
      * @param sessionId 会话 ID
      */
     static void destroySession(const std::string& sessionId);
+};
+
+/**
+ * @brief 2FA 恢复码存储（MySQL）
+ */
+class RecoveryCodeStore {
+public:
+    /**
+     * @brief 批量保存恢复码哈希
+     * @param userId 用户 ID
+     * @param hashedCodes 恢复码的 SHA-256 哈希列表
+     * @return bool 是否成功
+     */
+    static bool save(int64_t userId, const std::vector<std::string>& hashedCodes);
+
+    /**
+     * @brief 验证并消费恢复码（原子操作）
+     * @param userId 用户 ID
+     * @param code 明文恢复码
+     * @return true 验证通过并已标记使用
+     */
+    static bool consume(int64_t userId, const std::string& code);
+
+    /**
+     * @brief 删除用户所有恢复码（禁用 2FA 时调用）
+     * @param userId 用户 ID
+     */
+    static void removeAll(int64_t userId);
 };
 
 } // namespace auth
