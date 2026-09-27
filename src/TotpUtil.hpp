@@ -32,9 +32,6 @@ public:
     static std::string HashRecoveryCode(const std::string& code);
 
 private:
-    static std::string Base32Encode(const uint8_t* data, size_t len);
-    static std::vector<uint8_t> Base32Decode(const std::string& encoded);
-    static std::string HmacSha1(const std::string& key, const std::string& message);
     static uint32_t DynamicTruncation(const std::string& hmacResult);
     static uint32_t GenerateTotp(const std::string& secret, int64_t timeStep);
 };

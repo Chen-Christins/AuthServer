@@ -76,13 +76,13 @@ bool AuthModule::onServerUp() {
     return true;
 }
 
-bool AuthModule::onDrain() {
-    INFO(logger) << "onDrain";
+bool AuthModule::onActivate() {
+    INFO(logger) << "onActivate";
     return true;
 }
 
-bool AuthModule::onGracefulUnload() {
-    INFO(logger) << "onGracefulUnload";
+bool AuthModule::onDeactivate() {
+    INFO(logger) << "onDeactivate";
     return true;
 }
 

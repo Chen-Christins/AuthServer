@@ -17,74 +17,11 @@ namespace auth {
 
 static const int kTimeStep = 30;
 static const int kDigits = 6;
-static const char kBase32Alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 static const char kRecoveryChars[] = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
 
 std::string TotpUtil::GenerateSecret() {
     std::string randomData = chen::RandomUtil::RandBytes(20);
-    return Base32Encode(reinterpret_cast<const uint8_t*>(randomData.data()), randomData.size());
-}
-
-std::string TotpUtil::Base32Encode(const uint8_t* data, size_t len) {
-    std::string result;
-    int bits = 0;
-    uint32_t value = 0;
-
-    for (size_t i = 0; i < len; ++i) {
-        value = (value << 8) | data[i];
-        bits += 8;
-        while (bits >= 5) {
-            result += kBase32Alphabet[(value >> (bits - 5)) & 0x1F];
-            bits -= 5;
-        }
-    }
-    if (bits > 0) {
-        result += kBase32Alphabet[(value << (5 - bits)) & 0x1F];
-    }
-    while (result.size() % 8 != 0) {
-        result += '=';
-    }
-    return result;
-}
-
-std::vector<uint8_t> TotpUtil::Base32Decode(const std::string& encoded) {
-    std::vector<uint8_t> result;
-    int bits = 0;
-    uint32_t value = 0;
-
-    for (char c : encoded) {
-        if (c == '=' || c == ' ') {
-            continue;
-        }
-        int idx = -1;
-        if (c >= 'A' && c <= 'Z') {
-            idx = c - 'A';
-        } else if (c >= '2' && c <= '7') {
-            idx = c - '2' + 26;
-        } else if (c >= 'a' && c <= 'z') {
-            idx = c - 'a';
-        }
-        if (idx < 0) {
-            continue;
-        }
-        value = (value << 5) | idx;
-        bits += 5;
-        if (bits >= 8) {
-            result.push_back(static_cast<uint8_t>((value >> (bits - 8)) & 0xFF));
-            bits -= 8;
-        }
-    }
-    return result;
-}
-
-std::string TotpUtil::HmacSha1(const std::string& key, const std::string& message) {
-    unsigned char digest[SHA_DIGEST_LENGTH];
-    unsigned int len = SHA_DIGEST_LENGTH;
-    HMAC(EVP_sha1(),
-         key.data(), key.size(),
-         reinterpret_cast<const unsigned char*>(message.data()), message.size(),
-         digest, &len);
-    return std::string(reinterpret_cast<char*>(digest), len);
+    return chen::StringUtil::Base32Encode(randomData);
 }
 
 uint32_t TotpUtil::DynamicTruncation(const std::string& hmacResult) {
@@ -108,10 +45,9 @@ uint32_t TotpUtil::GenerateTotp(const std::string& secret, int64_t timeStep) {
     }
     std::string timeMessage(reinterpret_cast<char*>(timeBytes), 8);
 
-    std::vector<uint8_t> secretBytes = Base32Decode(secret);
-    std::string key(reinterpret_cast<char*>(secretBytes.data()), secretBytes.size());
+    std::string key = chen::StringUtil::Base32Decode(secret);
 
-    std::string hmac = HmacSha1(key, timeMessage);
+    std::string hmac = chen::EncryptorUtil::HMAC_SHA1(key, timeMessage);
     uint32_t truncated = DynamicTruncation(hmac);
     return truncated % (1u << (kDigits * 3));
 }
@@ -140,8 +76,7 @@ bool TotpUtil::VerifyCode(const std::string& secret, const std::string& code, in
     return false;
 }
 
-std::string TotpUtil::GetOtpUri(const std::string& secret, const std::string& account,
-                                 const std::string& issuer) {
+std::string TotpUtil::GetOtpUri(const std::string& secret, const std::string& account, const std::string& issuer) {
     std::stringstream ss;
     ss << "otpauth://totp/"
        << issuer << ":" << account

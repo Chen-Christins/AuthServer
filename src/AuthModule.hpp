@@ -58,16 +58,20 @@ public:
     bool onServerUp() override;
 
     /**
-     * @brief 热重载排空阶段（蓝绿部署）：关闭 WS 连接、停止定时器
+     * @brief 模块激活：新模块接管流量时调用（热重载）
+     * @details 在所有 server 的 dispatch 切换后调用。模块应在此方法中
+     *          注册新的 servlet/handler。默认实现调用 onServerReady()。
      * @return bool
      */
-    bool onDrain() override;
+    bool onActivate() override;
 
     /**
-     * @brief 热重载排空完成（蓝绿部署）：释放非 dispatch 资源
+     * @brief 模块停用：旧模块被替换时调用（热重载）
+     * @details 新模块已接管，旧模块停止接收新请求。
+     *          用于关闭 WebSocket 连接等长连接。默认实现返回 true。
      * @return bool
      */
-    bool onGracefulUnload() override;
+    bool onDeactivate() override;
 
     /**
      * @brief 模块每个 Tick 调用一次
